@@ -217,7 +217,8 @@ public partial class Player
         // ⚠️ เดิมใช้ค่าฐานดิบอย่างเดียว ⇒ เรียนสกิลป้องกันไปก็โดนสัตว์กัดเจ็บเท่าเดิม
         float value = Math.Max(CombatTuning.MinDamage,
                                (float)Math.Round((animal.Attack - CurrentDerivedDefense())
-                                                 * DamageTakenScale()));
+                                                 * DamageTakenScale()
+                                                 * AnimalDamageMultiplier));
 
         _world.BroadCast(new Damaged
         {
@@ -269,6 +270,14 @@ public partial class Player
     /// 1 ช่อง = 200 หน่วย ≈ ระยะที่ตัวสัตว์กับผู้เล่นเกือบชนกันบนจอ
     /// </summary>
     private const int AnimalAttackTiles = 1;
+
+    /// <summary>
+    /// Custom-server balance: the original live server's complete server-side damage formula
+    /// is unavailable. Animal JSON attack stats already scale with combat level, but the
+    /// simplified custom-server hit path made wild animals feel too weak after player defense.
+    /// Keep this multiplier centralized so it can be tuned without changing the source stats.
+    /// </summary>
+    private const float AnimalDamageMultiplier = 2.0f;
 
     /// <summary>**ค่าของเรา** — สัตว์หยุดห่างจากผู้เล่นกี่หน่วยตอนวิ่งเข้าหา (ไม่ให้เดินทับตัว)</summary>
     private const float AttackStopDistance = 150f;
