@@ -114,7 +114,7 @@ public class Gateway
                               || string.CompareOrdinal(clientVersion, MinClientVersion) >= 0;
             if (!compatible)
             {
-                Console.WriteLine($"[version] Rejected client version {clientVersion} (ต้องอย่างน้อย {MinClientVersion})");
+                Console.WriteLine($"[version] Rejected client version {clientVersion} (minimum required: {MinClientVersion})");
             }
 
             JObject jObject = new()
@@ -379,27 +379,27 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return new WebServer.JsonResponse(Json.Write(_host.DescribeOnline()));
         };
 
-        // เตะออกจากเกม (ยังเข้าใหม่ได้) — ใช้ตอนคนค้างหรือมีปัญหาชั่วคราว
+        // Kick a player from the game without banning them; useful for stuck sessions or temporary issues.
         _webServer.PostRoute["/admin/kick"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string entityId = postData.Get("entity_id");
-            string reason = postData.Get("reason") ?? "ถูกเตะโดยผู้ดูแล";
+            string reason = postData.Get("reason") ?? "Kicked by an administrator";
             bool done = _host.KickPlayer(entityId, reason);
             return new WebServer.JsonResponse(new JObject { ["kicked"] = done }.ToString());
         };
 
-        // แบนบัญชี (เตะออกด้วย) — แบนที่กุญแจบัญชี ไม่ใช่ตัวละคร เพราะสร้างตัวใหม่ได้ฟรี
+        // Ban the account and kick the player; bans are tied to account keys, not individual characters.
         _webServer.PostRoute["/admin/ban"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string entityId = postData.Get("entity_id");
-            string reason = postData.Get("reason") ?? "ถูกแบนโดยผู้ดูแล";
+            string reason = postData.Get("reason") ?? "Banned by an administrator";
             PlayerContext target = _host.FindContextByEntityId(entityId);
             if (target == null || string.IsNullOrEmpty(target.OwnerKey))
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "ไม่พบตัวละคร หรือตัวละครยังไม่มีเจ้าของ" }.ToString(),
+                    new JObject { ["error"] = "Character not found or character has no owner" }.ToString(),
                     HttpStatusCode.NotFound);
             }
             BanList.Add(target.OwnerKey, reason);
@@ -416,9 +416,9 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return new WebServer.JsonResponse(new JObject { ["unbanned"] = done }.ToString());
         };
 
-        // เงินทั้งเซิร์ฟ — ไว้เฝ้าเงินเฟ้อ (เซิร์ฟนี้ใช้สกุลเดียว ดู Core/Player.Wallet.cs)
-        // เรียกซ้ำแล้วเทียบ total_tstone ตามเวลา ถ้ามันโตเร็วกว่าจำนวนตัวละคร = ก๊อกแรงเกินท่อระบาย
-        // ?top=N เพื่อดูผู้ถือรายใหญ่มากกว่า 20 อันดับ
+        // Server-wide currency metrics for inflation monitoring; this server uses one currency. See Core/Player.Wallet.cs.
+        // Compare total_tstone over time; growth faster than character count can indicate inflation.
+        // Use ?top=N to return more than the default 20 top holders.
         _webServer.GetRoute["/admin/economy"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
@@ -428,10 +428,10 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return new WebServer.JsonResponse(Json.Write(_host.DescribeEconomy(top)));
         };
 
-        // ตั้งยอดเงินของตัวละครหนึ่งตัว — ไว้ปรับสมดุล/เทส
-        // ตั้ง "ค่าที่ต้องการ" ไม่ใช่ "บวกเพิ่ม" เพราะกดซ้ำแล้วผลไม่เพี้ยน (idempotent)
-        // ⚠️ นี่คือก๊อกน้ำที่ใหญ่ที่สุดในเซิร์ฟ — ผ่านด่านแอดมินเดียวกับ ban/kick
-        //    และเขียน log ทุกครั้งเพื่อให้ยอดที่เห็นใน /admin/economy อธิบายที่มาได้เสมอ
+        // Set one character's balance for balancing or testing.
+        // Set an absolute target balance, not an increment, so repeated requests are idempotent.
+        // ⚠️ This is a high-impact economy control protected by the same admin gate as ban/kick.
+        //    Every change is logged so values shown in /admin/economy remain auditable.
         _webServer.PostRoute["/admin/economy/set"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
@@ -440,22 +440,22 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             if (!long.TryParse(rawAmount, out long amount) || amount < 0)
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "amount ต้องเป็นจำนวนเต็มไม่ติดลบ" }.ToString(),
+                    new JObject { ["error"] = "amount must be a non-negative integer" }.ToString(),
                     HttpStatusCode.BadRequest);
             }
             PlayerContext target = _host.FindContextByEntityId(entityId);
             if (target == null)
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "ไม่พบตัวละคร" }.ToString(), HttpStatusCode.NotFound);
+                    new JObject { ["error"] = "Character not found" }.ToString(), HttpStatusCode.NotFound);
             }
             long before = target.TStone;
             target.TStone = amount;
-            // ⚠️ ต้องสั่งเซฟเอง — คนที่ไม่ได้ออนไลน์ไม่มี Player ให้เรียก OnContextChanged
-            //    ถ้าไม่เซฟ ยอดจะอยู่แค่ในหน่วยความจำแล้วหายตอนรีสตาร์ตเซิร์ฟ
+            // ⚠️ Save explicitly; offline characters have no Player instance to trigger OnContextChanged.
+            //    Without saving, the balance remains in memory and is lost when the server restarts.
             target.Save();
-            Console.WriteLine($"[เงิน] แอดมินตั้งยอดของ {entityId} จาก {before:N0} เป็น {amount:N0} T Stone");
-            // ถ้าคนนั้นออนไลน์อยู่ ต้องดันยอดใหม่ไปให้เห็นทันที ไม่งั้นหน้าจอค้างยอดเก่าจนกว่าจะเข้าใหม่
+            Console.WriteLine($"[economy] Admin changed character {entityId} balance from {before:N0} to {amount:N0} T Stone");
+            // If the character is online, immediately send the new balance or the client will keep showing the old value.
             _host.PushWalletTo(entityId);
             return new WebServer.JsonResponse(
                 new JObject { ["entity_id"] = entityId, ["before"] = before, ["after"] = amount }.ToString());
@@ -467,7 +467,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return new WebServer.JsonResponse(Json.Write(BanList.Describe()));
         };
 
-        // ประกาศถึงทุกคนที่ออนไลน์ — ใช้บอกก่อนปิดปรับปรุง
+        // Broadcast to all online players, for example before maintenance.
         _webServer.PostRoute["/admin/announce"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
@@ -475,102 +475,102 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             if (string.IsNullOrEmpty(text))
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "ต้องมี text" }.ToString(), HttpStatusCode.BadRequest);
+                    new JObject { ["error"] = "text is required" }.ToString(), HttpStatusCode.BadRequest);
             }
             int sent = _host.Announce(text);
             return new WebServer.JsonResponse(new JObject { ["sent"] = sent }.ToString());
         };
 
-        // ปิดปรับปรุง — คนที่เล่นอยู่ยังเล่นต่อได้ แต่คนใหม่เข้าไม่ได้
-        // (ไม่เตะคนที่เล่นอยู่ทันที เพื่อให้ประกาศก่อนแล้วรอคนทยอยออกได้)
+        // Maintenance mode blocks new players while allowing current players to continue.
+        // Existing players are not kicked immediately, allowing time for a broadcast and orderly logout.
         _webServer.PostRoute["/admin/maintenance"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             Host.Maintenance = postData.Get("on") == "1";
             Console.WriteLine(Host.Maintenance
-                ? "[ดูแล] เปิดโหมดปิดปรับปรุง — คนใหม่เข้าไม่ได้ (คนที่เล่นอยู่ยังเล่นต่อได้)"
-                : "[ดูแล] ปิดโหมดปิดปรับปรุง — เปิดรับคนใหม่ตามปกติ");
+                ? "[admin] Maintenance enabled; new players cannot join, current players may continue"
+                : "[admin] Maintenance disabled; new players may join again");
             return new WebServer.JsonResponse(new JObject { ["maintenance"] = Host.Maintenance }.ToString());
         };
 
-        // ══ Admin Web Tool — จัดการ config / islands / whitelist ═══════════════════════════════════
+        // ══ Admin Web Tool — manage config, islands, and whitelist ═══════════════════════════════════
 
-        // อ่าน config.json ทั้งหมด
+        // Read config.json.
         _webServer.GetRoute["/admin/config"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string path = Path.Combine(DataDir ?? Json.DataDir, "config.json");
             if (!File.Exists(path))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ไม่พบ config.json" }.ToString(), HttpStatusCode.NotFound);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "config.json not found" }.ToString(), HttpStatusCode.NotFound);
             return new WebServer.JsonResponse(File.ReadAllText(path));
         };
 
-        // เขียน config.json (partial update — ส่ง key/value ที่ต้องการเปลี่ยน)
+        // Update selected key/value pairs in config.json.
         _webServer.PostRoute["/admin/config"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string json = postData.Get("json");
             if (string.IsNullOrEmpty(json))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ต้องมี json" }.ToString(), HttpStatusCode.BadRequest);
-            // ตรวจว่า JSON ถูกต้องก่อนเขียน
+                return new WebServer.JsonResponse(new JObject { ["error"] = "json is required" }.ToString(), HttpStatusCode.BadRequest);
+            // Validate JSON before writing.
             try { JObject.Parse(json); }
             catch (Exception e)
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "JSON ผิดรูปแบบ: " + e.Message }.ToString(), HttpStatusCode.BadRequest);
+                    new JObject { ["error"] = "Invalid JSON: " + e.Message }.ToString(), HttpStatusCode.BadRequest);
             }
             string path = Path.Combine(DataDir ?? Json.DataDir, "config.json");
             File.WriteAllText(path, json);
-            Console.WriteLine("[admin] config.json ถูกอัปเดตแล้ว");
+            Console.WriteLine("[admin] config.json updated");
             return new WebServer.JsonResponse(new JObject { ["saved"] = true }.ToString());
         };
 
-        // อ่าน config-meta.json (schema/descriptions สำหรับ admin UI)
+        // Read config-meta.json (schema and descriptions for the admin UI).
         _webServer.GetRoute["/admin/config/meta"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string path = Path.Combine(DataDir ?? Json.DataDir, "config-meta.json");
             if (!File.Exists(path))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ไม่พบ config-meta.json" }.ToString(), HttpStatusCode.NotFound);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "config-meta.json not found" }.ToString(), HttpStatusCode.NotFound);
             return new WebServer.JsonResponse(File.ReadAllText(path));
         };
 
-        // อ่าน islands.json
+        // Read islands.json.
         _webServer.GetRoute["/admin/islands"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string path = Path.Combine(DataDir ?? Json.DataDir, "islands.json");
             if (!File.Exists(path))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ไม่พบ islands.json" }.ToString(), HttpStatusCode.NotFound);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "islands.json not found" }.ToString(), HttpStatusCode.NotFound);
             return new WebServer.JsonResponse(File.ReadAllText(path));
         };
 
-        // เขียน islands.json
+        // Write islands.json.
         _webServer.PostRoute["/admin/islands"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string json = postData.Get("json");
             if (string.IsNullOrEmpty(json))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ต้องมี json" }.ToString(), HttpStatusCode.BadRequest);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "json is required" }.ToString(), HttpStatusCode.BadRequest);
             try { JObject.Parse(json); }
             catch (Exception e)
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "JSON ผิดรูปแบบ: " + e.Message }.ToString(), HttpStatusCode.BadRequest);
+                    new JObject { ["error"] = "Invalid JSON: " + e.Message }.ToString(), HttpStatusCode.BadRequest);
             }
             string path = Path.Combine(DataDir ?? Json.DataDir, "islands.json");
             File.WriteAllText(path, json);
-            Console.WriteLine("[admin] islands.json ถูกอัปเดตแล้ว");
+            Console.WriteLine("[admin] islands.json updated");
             return new WebServer.JsonResponse(new JObject { ["saved"] = true }.ToString());
         };
 
-        // อ่าน whitelist.txt
+        // Read whitelist.txt.
         _webServer.GetRoute["/admin/whitelist"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string path = Path.Combine(DataDir ?? Json.DataDir, "whitelist.txt");
             if (!File.Exists(path))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ไม่พบ whitelist.txt" }.ToString(), HttpStatusCode.NotFound);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "whitelist.txt not found" }.ToString(), HttpStatusCode.NotFound);
             string[] lines = File.ReadAllLines(path);
             JArray arr = new();
             foreach (string line in lines)
@@ -582,15 +582,15 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return new WebServer.JsonResponse(new JObject { ["entries"] = arr }.ToString());
         };
 
-        // เขียน whitelist.txt
+        // Write whitelist.txt.
         _webServer.PostRoute["/admin/whitelist"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string entries = postData.Get("entries");
             if (string.IsNullOrEmpty(entries))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ต้องมี entries" }.ToString(), HttpStatusCode.BadRequest);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "entries is required" }.ToString(), HttpStatusCode.BadRequest);
             string path = Path.Combine(DataDir ?? Json.DataDir, "whitelist.txt");
-            File.WriteAllText(path, "# รายชื่อที่อนุญาตให้เข้าเซิร์ฟ (entity id หรือชื่อตัวละคร บรรทัดละ 1)\n" + entries);
+            File.WriteAllText(path, # Allowed players (entity ID or character name, one per line)\n + entries);
             Console.WriteLine("[admin] whitelist.txt ถูกอัปเดตแล้ว");
             return new WebServer.JsonResponse(new JObject { ["saved"] = true }.ToString());
         };
@@ -601,37 +601,37 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             if (!IsAdminAllowed(request)) return Forbidden();
             string islandId = request.QueryString.Get("id");
             if (string.IsNullOrEmpty(islandId))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ต้องมี ?id=" }.ToString(), HttpStatusCode.BadRequest);
-            // กัน path traversal
+                return new WebServer.JsonResponse(new JObject { ["error"] = "?id= is required" }.ToString(), HttpStatusCode.BadRequest);
+            // Prevent path traversal.
             if (islandId.Contains("..") || islandId.Contains('/') || islandId.Contains('\\'))
                 return new WebServer.BadRequestResponse();
             string path = Path.Combine(DataDir ?? Json.DataDir, "islands", islandId, "config.json");
             if (!File.Exists(path))
-                return new WebServer.JsonResponse(new JObject { ["error"] = $"ไม่พบ config ของ {islandId}" }.ToString(), HttpStatusCode.NotFound);
+                return new WebServer.JsonResponse(new JObject { ["error"] = $"Config not found for island {islandId}" }.ToString(), HttpStatusCode.NotFound);
             return new WebServer.JsonResponse(File.ReadAllText(path));
         };
 
-        // เขียน per-island config
+        // Write per-island configuration.
         _webServer.PostRoute["/admin/island/config"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
             string islandId = postData.Get("id");
             string json = postData.Get("json");
             if (string.IsNullOrEmpty(islandId) || string.IsNullOrEmpty(json))
-                return new WebServer.JsonResponse(new JObject { ["error"] = "ต้องมี id และ json" }.ToString(), HttpStatusCode.BadRequest);
+                return new WebServer.JsonResponse(new JObject { ["error"] = "id and json are required" }.ToString(), HttpStatusCode.BadRequest);
             if (islandId.Contains("..") || islandId.Contains('/') || islandId.Contains('\\'))
                 return new WebServer.BadRequestResponse();
             try { JObject.Parse(json); }
             catch (Exception e)
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "JSON ผิดรูปแบบ: " + e.Message }.ToString(), HttpStatusCode.BadRequest);
+                    new JObject { ["error"] = "Invalid JSON: " + e.Message }.ToString(), HttpStatusCode.BadRequest);
             }
             string dir = Path.Combine(DataDir ?? Json.DataDir, "islands", islandId);
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "config.json");
             File.WriteAllText(path, json);
-            Console.WriteLine($"[admin] islands/{islandId}/config.json ถูกอัปเดตแล้ว");
+            Console.WriteLine($"[admin] islands/{islandId}/config.json updated");
             return new WebServer.JsonResponse(new JObject { ["saved"] = true }.ToString());
         };
 
@@ -642,18 +642,18 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             try
             {
                 DataStore.Load(DataDir ?? Json.DataDir);
-                Console.WriteLine("[admin] Reload config สำเร็จ");
+                Console.WriteLine("[admin] Config reload succeeded");
                 return new WebServer.JsonResponse(new JObject { ["reloaded"] = true }.ToString());
             }
             catch (Exception e)
             {
                 return new WebServer.JsonResponse(
-                    new JObject { ["error"] = "Reload ไม่สำเร็จ: " + e.Message }.ToString(), HttpStatusCode.InternalServerError);
+                    new JObject { ["error"] = "Reload failed: " + e.Message }.ToString(), HttpStatusCode.InternalServerError);
             }
         };
 
-        // ══ Admin Web UI — เสิร์ฟไฟล์ admin/index.html, style.css, app.js ══════════════════════════
-        // เข้า /admin/ จะได้ index.html, /admin/style.css ได้ CSS, /admin/app.js ได้ JS
+        // ══ Admin Web UI — serves admin/index.html, style.css, and app.js ══════════════════════════
+        // /admin/ serves index.html; /admin/style.css serves CSS; /admin/app.js serves JavaScript.
 
         _webServer.GetRoute["/health"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
@@ -970,7 +970,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             if (!Directory.Exists(adminDir))
             {
                 return (HttpListenerRequest _, Dictionary<string, string> __) =>
-                    new WebServer.TextResponse("text/plain", "Admin UI ไม่พบ — วางไฟล์ admin/ ไว้ข้าง executable", HttpStatusCode.NotFound);
+                    new WebServer.TextResponse("text/plain", "Admin UI not found; place the admin/ folder beside the executable", HttpStatusCode.NotFound);
             }
 
             string adminFile = url.Split('?')[0];
@@ -990,10 +990,10 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
 
             if (!File.Exists(targetFile))
                 return (HttpListenerRequest _, Dictionary<string, string> __) =>
-                    new WebServer.TextResponse("text/plain", "ไม่พบไฟล์", HttpStatusCode.NotFound);
+                    new WebServer.TextResponse("text/plain", "File not found", HttpStatusCode.NotFound);
 
-            // ใช้ TextResponse แทน FileResponse เพื่อกำหนด Content-Type ถูกต้อง
-            // (FileResponse ใช้ DirectLength ซึ่งข้าม Content-Type header → browser ดาวน์โหลดแทน render)
+            // Use TextResponse to set the correct Content-Type.
+            // FileResponse uses DirectLength and skips the Content-Type header, causing the browser to download instead of render.
             string fileContentType = "application/octet-stream";
             if (targetFile.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) fileContentType = "text/html; charset=utf-8";
             else if (targetFile.EndsWith(".css", StringComparison.OrdinalIgnoreCase)) fileContentType = "text/css; charset=utf-8";
@@ -1004,19 +1004,19 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
 
             string ct = fileContentType;
             string fPath = targetFile;
-            // RawBytesResponse อยู่ที่ server/Support/RawBytesResponse.cs — สืบทอด WebServer.Response
-            // ไม่ได้แก้ไฟล์ต้นฉบับใน GameCode (ดูเหตุผลเต็มในไฟล์นั้น)
+            // RawBytesResponse is in server/Support/RawBytesResponse.cs and derives from WebServer.Response.
+            // The original GameCode file is intentionally unchanged; see that file for the rationale.
             //
-            // ⚠️ ต้องเป็น ReadAllBytes ไม่ใช่ ReadAllText+GetBytes — รายการ content type ข้างบน
-            // มี image/png กับ image/x-icon ด้วย ไฟล์ไบนารีที่ผ่าน string จะถูกแปลงอักขระจนพัง
-            // (byte ที่ไม่ใช่ UTF-8 ที่ถูกต้องจะกลายเป็น U+FFFD แล้วเขียนกลับเป็น EF BF BD)
+            // ⚠️ Use ReadAllBytes, not ReadAllText+GetBytes; the content types above include binary assets.
+            // PNG and icon files would be corrupted if binary data passed through strings.
+            // Invalid UTF-8 bytes become U+FFFD and are written back as EF BF BD.
             return (HttpListenerRequest _, Dictionary<string, string> __) =>
                 new RawBytesResponse(File.ReadAllBytes(fPath), ct);
         }
 
-        // [5 ก.ย. 2026] ตารางข้อมูลเกมสำหรับโหมด Online — client/Yaml.Util/Loader.cs:155-185
-        // ยิง GET <gateway>/assets/<ชื่อ> (ไม่มีนามสกุล) แล้ว Json.Read<T> ผลลัพธ์ตรง ๆ
-        // ไฟล์จริงอยู่ที่ <AssetsDir>/<ชื่อ>.json — เกมขอ 71 เส้นทาง เรามีครบใน data/assets
+        // [Sep 5, 2026] Game data tables for Online mode; see client/Yaml.Util/Loader.cs:155-185.
+        // The client requests GET <gateway>/assets/<name> (without extension) and deserializes the JSON response.
+        // Files are stored at <AssetsDir>/<name>.json; the game requests 71 routes, all present in data/assets.
         if (url.StartsWith("/assets/", StringComparison.OrdinalIgnoreCase))
         {
             string assetsDir = AssetsDir;
@@ -1030,7 +1030,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             {
                 relative = relative.Substring(0, qIdx);
             }
-            // กัน path traversal — client ขอแค่ <โฟลเดอร์>/<ชื่อ> ธรรมดา ไม่มี .. และไม่ใช่ path เต็ม
+            // Prevent path traversal. — client ขอแค่ <โฟลเดอร์>/<ชื่อ> ธรรมดา ไม่มี .. และไม่ใช่ path เต็ม
             if (relative.Length == 0 || relative.Contains("..") || Path.IsPathRooted(relative))
             {
                 return (HttpListenerRequest _, Dictionary<string, string> __) => new WebServer.BadRequestResponse();
@@ -1045,7 +1045,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             {
                 if (!File.Exists(assetPath))
                 {
-                    // ⚠️ ขาดไฟล์ไหน เกมจะรีทราย 5 รอบแล้วค้างหน้าโหลด — ต้องดังพอให้เห็นใน log ทันที
+                    // ⚠️ A missing file causes five retries and then a stuck loading screen; log it clearly.
                     Console.WriteLine($"[assets] 404 {relative}");
                     return new WebServer.NotFountResponse();
                 }
@@ -1057,7 +1057,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             };
         }
 
-        // client ประกอบ URL ตามรูปแบบ CDN เดิม: /{live|release}/{platform}/<ไฟล์> (จาก /knock URLs)
+        // The client builds CDN-style URLs: /{live|release}/{platform}/<file>, based on /knock URLs.
         if (url.StartsWith("/live/", StringComparison.OrdinalIgnoreCase) ||
             url.StartsWith("/release/", StringComparison.OrdinalIgnoreCase))
         {
@@ -1080,12 +1080,12 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
                 return (HttpListenerRequest request, Dictionary<string, string> postData) => new WebServer.BadRequestResponse();
             }
             string aPath = Path.Combine(AssetBundleAndroidDir, aName);
-            // [แก้เอง] 5 ก.ย. 2026 — เสิร์ฟแบบสตรีม (FileResponse) แทน File.ReadAllBytes
+            // [Sep 5, 2026] Stream bundles with FileResponse instead of File.ReadAllBytes.
             //
-            // bundle ก้อนละหลาย MB: ReadAllBytes = byte[] ก้อนใหญ่ตกไป Large Object Heap ทุกคำขอ
-            // มือถือหลายเครื่องโหลดพร้อมกัน ⇒ GC ถี่จนลูปเกมหยุดเดิน (วัดจริง 13 คน = 2 tps)
-            // FileResponse อ่านทีละ 64 KB เขียนตรงลง OutputStream — หน่วยความจำคงที่ ไม่แตะ LOH
-            // (คลาสนี้มีมาตั้งแต่ 4 ก.ย. แต่ไม่เคยถูกเรียกใช้จริงเลย)
+            // Bundles are several MB; ReadAllBytes allocates large byte arrays on the Large Object Heap for each request.
+            // Concurrent mobile downloads caused frequent GC pauses and slowed the game loop (13 players measured at 2 TPS).
+            // FileResponse streams 64 KB at a time to OutputStream, keeping memory usage stable and avoiding the LOH.
+            // This class existed since Sep 4 but was not previously used.
             return (HttpListenerRequest request, Dictionary<string, string> postData) =>
             {
                 if (File.Exists(aPath))
@@ -1097,11 +1097,11 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
                 {
                     return new WebServer.FileResponse(resolvedA);
                 }
-                // soundbank พากย์เสียงแยกภาษา: ชุด Android มีแค่ en_us — เสิร์ฟ en_us แทนทุกภาษา
+                // Voice-over soundbanks are language-specific; the Android bundle only has en_us, so serve it for all languages.
                 string fallbackA = ResolveVoiceBankFallback(aName, AssetBundleAndroidDir);
                 if (fallbackA != null)
                 {
-                    Console.WriteLine("[assetbundle-android] {0} ไม่มี ⇒ เสิร์ฟ en_us แทน", aName);
+                    Console.WriteLine("[assetbundle-android] {0} missing; serving en_us instead", aName);
                     return new WebServer.FileResponse(fallbackA);
                 }
                 Console.WriteLine("[assetbundle-android] 404 {0}", aName);
@@ -1114,13 +1114,13 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return TerrainRoute(url);
         }
 
-        // [ลบเอง] 5 ก.ย. 2026 — ตรงนี้เคยมีบล็อก "/assetbundles/android/" ชุดที่สอง เหมือนกันทุกบรรทัด
-        // แต่เข้าไม่ถึงเลย เพราะเงื่อนไขชุดแรก (ข้างบน) จับ url เดียวกันไปก่อนเสมอ ⇒ ลบทิ้ง
-        // (แก้ที่ชุดแรกที่เดียวพอ ไม่ต้องแก้สองที่แล้วลืมที่ใดที่หนึ่ง)
+        // [Removed Sep 5, 2026] A duplicate /assetbundles/android/ block used to exist here.
+        // It was unreachable because the first matching condition handled the same URL, so it was removed.
+        // Keep the behavior in one place to avoid inconsistent fixes.
         return (HttpListenerRequest request, Dictionary<string, string> _) => new WebServer.BadRequestResponse();
     }
 
-    /// <summary>client ขอ <ชื่อ>.<crc>.bundle — ถ้า crc ไม่ตรงไฟล์บนดิสก์ หาด้วย "ชื่อตัด hash"</summary>
+    /// <summary>The client requests &lt;name&gt;.&lt;crc&gt;.bundle; if the CRC does not match a disk file, look up the unhashed name.</summary>
     private static string ResolveBundleIgnoringHash(string requestedName, string dir)
     {
         const string suffix = ".bundle";
@@ -1139,7 +1139,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
         }
     }
 
-    /// <summary>เสียงพากย์: soundbanks$android$<lang>$voice_*.bnk — เซิร์ฟมีแค่ en_us</summary>
+    /// <summary>Voice-over soundbanks: soundbanks$android/// <summary>เสียงพากย์: soundbanks$android$<lang>$voice_*.bnk — เซิร์ฟมีแค่ en_us</summary>lt;lang&gt;$voice_*.bnk; only en_us is available on the server.</summary>
     private static string ResolveVoiceBankFallback(string requestedName, string dir)
     {
         const string marker = "$android$";
