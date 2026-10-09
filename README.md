@@ -1,84 +1,67 @@
-﻿# Durango LastHuman
+# Durango Custom Server
 
-เซิร์ฟเวอร์ส่วนตัวของเกม **Durango: Wild Lands** สร้างจากโค้ดเซิร์ฟที่ NEXON ฝังมาในตัวเกมเอง
-พอร์ตขึ้น .NET 9 แล้วเปลี่ยนชื่อ `Durango.Offline` → **`Durango.Online`** เพราะโปรเจกต์นี้ทำเวอร์ชันออนไลน์เท่านั้น
+เซิร์ฟเวอร์ทดลองสำหรับ Durango: Wild Lands พัฒนาด้วย .NET 9
 
-## โครงสร้าง
+> หมายเหตุ: repository นี้เก็บซอร์สเซิร์ฟเวอร์เป็นหลัก ไฟล์เกมจริงไม่ได้อยู่ใน Git และต้องจัดเตรียมแยกต่างหากอย่างถูกต้องตามสิทธิ์การใช้งาน
 
+## โครงสร้าง repository
+
+- `server/` — โค้ดเซิร์ฟเวอร์ .NET 9, protocol, world, gateway และ data ที่มีอยู่ใน repository
+- `tools/start-server.ps1` — เมนู Windows สำหรับ build, start และ selftest
+- `เปิดเซิร์ฟ.bat` — ตัวเปิดเมนูบน Windows
+- `game/` — โฟลเดอร์ lokal untuk file game; diabaikan oleh Git dan tidak disertakan di repository
+
+ไฟล์ client source, dokumen roadmap, dan skrip lama yang disebut di dokumentasi sebelumnya tidak tersedia di branch ini. Karena itu, jangan menganggap perintah build client atau scan-protocol tersedia.
+
+## Persyaratan
+
+- Windows 10/11
+- .NET 9 SDK
+- PowerShell (tersedia di Windows)
+
+Unduh .NET 9 SDK: https://dotnet.microsoft.com/download/dotnet/9.0
+
+## Menjalankan di Windows
+
+1. Clone atau unduh repository.
+2. Pastikan .NET 9 SDK terpasang.
+3. Klik dua kali `เปิดเซิร์ฟ.bat`.
+4. Pilih menu `2` untuk build server, atau `3` untuk build lalu menjalankan server.
+5. Pilih menu `4` untuk selftest.
+
+Menu launcher:
+- `1` Jalankan server (gateway HTTP 8190, game TCP 8191)
+- `2` Build server Release
+- `3` Build lalu jalankan server
+- `4` Jalankan selftest menggunakan port sementara 18290/18291
+- `5` Buka folder game lokal jika tersedia
+- `6` Lihat 100 baris log terakhir
+- `0` Keluar dari menu
+
+Jendela server berjalan terpisah. Untuk menghentikan dengan aman, fokuskan jendela server lalu tekan **Ctrl+C** dan tunggu pesan bahwa data selesai disimpan. Jangan mematikan proses secara paksa kecuali diperlukan.
+
+Log launcher disimpan di `logs/server-latest.log` pada komputer lokal; folder log tidak dikomit ke Git.
+
+## Build dari terminal
+
+Jalankan dari folder utama repository:
+
+```powershell
+dotnet --list-sdks
+dotnet build server/DurangoServer.csproj -c Release
 ```
-server/          เซิร์ฟ .NET 9
-  Core/          ตัวเซิร์ฟ (Host, GameServer, Gateway, World, Player, ...)
-  Support/       shim แทนของที่อยู่ใน Unity (Yaml/prototype/สี/แปลภาษา)
-  GameCode/      ชั้น protocol + data ของเกม (Messages/ 852 ตัว TypeCode ตรงต้นฉบับ 100%)
-  Shims/         UnityEngine shim (Mathf/Vector/Random/Debug)
-  data/          terrain 14 แผนที่ · assets (prototype/recipe/artifact/pet) · config.json
-client/          ซอร์สเกม (Assembly-CSharp) ของ NEXON แท้ 3,755 ไฟล์
-game/            ตัวเกมที่เล่นได้จริง (ไม่อยู่ใน git — ก๊อปมาจากชุดแจก)
-tools/           สคริปต์ build / เปิดเซิร์ฟ / สแกนโปรโตคอล
-docs/           ROADMAP.md · ROADMAP-NEXT.md · TODO.md · NEXON-SERVER-ARCHITECTURE.md · ITEM-SYSTEM-MAP.md · protocol-coverage.md
-```
 
-## เริ่มใช้งาน
+Jika build gagal, salin seluruh pesan error pertama dari terminal untuk diperiksa. Jangan langsung menghapus folder `bin`, `obj`, atau data save sebelum ada diagnosis.
 
-ดับเบิลคลิก **`เปิดเซิร์ฟ.bat`** แล้วเลือกจากเมนู:
+## Port server
 
-| เมนู | ทำอะไร |
+| Port | Fungsi |
 |---|---|
-| 1 | เปิดเซิร์ฟ (gateway 8190 / เกม 8191) |
-| 2 | build ใหม่แล้วเปิด |
-| 3 | หยุดเซิร์ฟ |
-| 4 | selftest — เช็ค handshake (ต้องเปิดเซิร์ฟก่อน) |
-| 5 | เปิดเกม |
-| 6 | ดู log ล่าสุด |
+| 8190/TCP | HTTP gateway, termasuk endpoint seperti `/knock`, `/sessions`, dan `/entry` |
+| 8191/TCP | Koneksi game dan handshake |
 
-หรือสั่งเองจากบรรทัดคำสั่ง:
+Untuk pengujian di komputer yang sama, gunakan `127.0.0.1`. Agar perangkat lain dapat terhubung, pastikan binding gateway, Windows Firewall, router/VPS firewall, dan alamat gateway client dikonfigurasi sesuai lingkungan. Jangan membuka port ke internet sebelum pengaturan akses dan keamanan ditinjau.
 
-```bash
-dotnet build server -c Release
-dotnet build client -c Release
-powershell -File tools\build-client.ps1     # build ซอร์สเกมแล้ววาง DLL ลง game\
-```
+## Status
 
-## พอร์ต
-
-| พอร์ต | ใช้ทำอะไร |
-|---|---|
-| 8190 | HTTP gateway — `/knock` `/sessions` `/entry` `/players` `/terrains` |
-| 8191 | TCP game — handshake `GetClock` → `Auth` → `Ready` แล้วเข้าโลก |
-
-`game/server.txt` ต้องชี้ `127.0.0.1:8190` (ค่าเริ่มต้นตรงอยู่แล้ว)
-
-ถ้าจะให้เครื่องอื่น (มือถือ/เพื่อนใน LAN) เข้าได้ ต้องรันครั้งเดียวแบบ **Run as administrator**:
-
-```bash
-netsh http add urlacl url=http://*:8190/ user=Everyone
-```
-
-ไม่งั้นเซิร์ฟจะตกไปฟังแค่ loopback (log บอกเอง: `wildcard bind denied, falling back to loopback`)
-
-## รู้ว่าเซิร์ฟยังขาดอะไร
-
-```bash
-python tools/scan-protocol.py          # สรุปลงจอ แยกตามระบบ
-python tools/scan-protocol.py --md     # เขียน docs/protocol-coverage.md
-```
-
-สคริปต์อ่านจากซอร์สจริง: `Send(new X{..})` ในซอร์สเกม เทียบกับ `Recv(delegate(X msg, ..))` ในเซิร์ฟ
-ตอนเล่นจริงเซิร์ฟก็พิมพ์บอกเองด้วย — `[conn] ไม่มี handler สำหรับ type=NNNN`
-เอาเลขไปหาชื่อ: `grep -l "TypeCode = NNNN" server/GameCode/Messages/*.cs`
-
-## สถานะ
-
-- เซิร์ฟ build ผ่าน · selftest ผ่าน (handshake + entity + chunk streaming)
-- ซอร์สเกม build ผ่าน · เกมเปิดได้
-- รับ message ได้ **42 ชนิด** จากที่เกมยิงออกมา **391** — งานต่อไปดู [docs/ROADMAP.md](docs/ROADMAP.md)
-- งานถัดไปที่ตกลงกันไว้: **ระบบล่องเรือ/หมู่เกาะ** (ต้องรื้อให้เซิร์ฟรองรับหลาย region ก่อน)
-
-## แผนงานล่าสุด
-
-- รายการติ๊ก: [docs/TODO.md](docs/TODO.md)
-- แผนเฟสถัดไป: [docs/ROADMAP-NEXT.md](docs/ROADMAP-NEXT.md)
-- สถาปัตยกรรม Nexon (อ้างอิง): [docs/NEXON-SERVER-ARCHITECTURE.md](docs/NEXON-SERVER-ARCHITECTURE.md)
-- ประวัติ/รายละเอียดเดิม: [docs/ROADMAP.md](docs/ROADMAP.md)
-- แผนที่ระบบไอเทม/เลเวล/แอต/บัฟ: [docs/ITEM-SYSTEM-MAP.md](docs/ITEM-SYSTEM-MAP.md)
-
+Launcher Windows telah ditambahkan kembali karena file `เปิดเซิร์ฟ.bat` memanggil `tools/start-server.ps1`, sedangkan skrip tersebut sebelumnya tidak ada di repository. Build dan selftest tetap perlu dijalankan pada mesin Windows dengan .NET 9 SDK; perubahan pada GitHub tidak berarti build sudah teruji di mesin pengguna.
