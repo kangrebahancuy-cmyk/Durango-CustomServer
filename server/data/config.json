@@ -161,7 +161,7 @@
   "Spawn": [
     {
       "Type": 2042,
-      "Name": "กิ้งก่า",
+      "Name": "Lizard / Kadal",
       "MinLevel": 1,
       "MaxLevel": 3,
       "Quota": 6,
@@ -172,7 +172,7 @@
     },
     {
       "Type": 2015,
-      "Name": "คอมป์โซกนาทัส",
+      "Name": "Compsognathus",
       "MinLevel": 1,
       "MaxLevel": 4,
       "Quota": 6,
@@ -183,7 +183,7 @@
     },
     {
       "Type": 2033,
-      "Name": "โดโดฟิซิส",
+      "Name": "Dodo fish / Ikan Dodo",
       "MinLevel": 2,
       "MaxLevel": 5,
       "Quota": 4,
@@ -194,7 +194,7 @@
     },
     {
       "Type": 2006,
-      "Name": "เฟนาโคดัส",
+      "Name": "Phenacodus",
       "MinLevel": 3,
       "MaxLevel": 6,
       "Quota": 4,
@@ -205,7 +205,7 @@
     },
     {
       "Type": 2017,
-      "Name": "โปรโตเซราท็อปส์",
+      "Name": "Protoceratops",
       "MinLevel": 3,
       "MaxLevel": 7,
       "Quota": 4,
@@ -216,7 +216,7 @@
     },
     {
       "Type": 2009,
-      "Name": "พาราซอโรโลฟัส",
+      "Name": "Parasaurolophus",
       "MinLevel": 5,
       "MaxLevel": 9,
       "Quota": 3,
@@ -227,7 +227,7 @@
     },
     {
       "Type": 2000,
-      "Name": "สเตโกซอรัส",
+      "Name": "Stegosaurus",
       "MinLevel": 6,
       "MaxLevel": 10,
       "Quota": 2,
@@ -238,7 +238,7 @@
     },
     {
       "Type": 2003,
-      "Name": "ทริเซราท็อปส์",
+      "Name": "Triceratops",
       "MinLevel": 6,
       "MaxLevel": 10,
       "Quota": 2,
@@ -249,7 +249,7 @@
     },
     {
       "Type": 2002,
-      "Name": "โอวิแรปเตอร์",
+      "Name": "Oviraptor",
       "MinLevel": 4,
       "MaxLevel": 8,
       "Quota": 2,
@@ -260,7 +260,7 @@
     },
     {
       "Type": 2001,
-      "Name": "แร็ปเตอร์",
+      "Name": "Raptor",
       "MinLevel": 7,
       "MaxLevel": 10,
       "Quota": 1,
@@ -273,7 +273,7 @@
   "Zones": [
     {
       "Id": "meadow",
-      "Name": "ทุ่งหญ้าหน้าบ้าน",
+      "Name": "Home Meadow / Padang Rumput Rumah",
       "OffsetTileX": 0,
       "OffsetTileY": 0,
       "RadiusTiles": 14,
@@ -285,7 +285,7 @@
     },
     {
       "Id": "forest",
-      "Name": "ชายป่า",
+      "Name": "Forest Edge / Tepi Hutan",
       "OffsetTileX": 22,
       "OffsetTileY": 6,
       "RadiusTiles": 13,
@@ -296,7 +296,7 @@
     },
     {
       "Id": "highland",
-      "Name": "ที่ราบสูง",
+      "Name": "Highlands / Dataran Tinggi",
       "OffsetTileX": -8,
       "OffsetTileY": 24,
       "RadiusTiles": 13,
@@ -308,7 +308,7 @@
     },
     {
       "Id": "raptor_den",
-      "Name": "หุบแร็ปเตอร์",
+      "Name": "Raptor Valley / Lembah Raptor",
       "OffsetTileX": 26,
       "OffsetTileY": -22,
       "RadiusTiles": 10,
