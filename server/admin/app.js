@@ -567,8 +567,8 @@
                         <td>${p.level || p.Level || '—'}</td>
                         <td>${esc(p.region || p.Region || '—')}</td>
                         <td>
-                            <button class="btn btn-warning btn-sm" onclick="window._kick('${esc(eid)}','${esc(name)}')">เตะ</button>
-                            <button class="btn btn-danger btn-sm" onclick="window._ban('${esc(eid)}','${esc(name)}')">แบน</button>
+                            <button class="btn btn-warning btn-sm" onclick="window._kick('${esc(eid)}','${esc(name)}')">Kick</button>
+                            <button class="btn btn-danger btn-sm" onclick="window._ban('${esc(eid)}','${esc(name)}')">Ban</button>
                         </td>
                     </tr>`;
                 }
