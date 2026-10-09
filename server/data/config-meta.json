@@ -507,69 +507,69 @@
     },
     "StyledBroadcastMinClientVersion": {
       "t": "string",
-      "d": "[3 ก.ย. 2026] client ชุดเราตั้งแต่รุ่นไหนที่รู้จักบรอดแคสต์แบบกำหนดเวลา/ขนาด/สี (\"##bc|…\") client ที่เก่ากว่านี้ (และมือถือของแท้ที่ส่ง \"5.2.1\") จะได้รับเป็นข้อความธรรมดาแทน ไม่งั้นผู้เล่นเห็นรหัส \"##bc|d=5|z=2|…\" ดิบ ๆ บนจอ — GameManager.ShowAdminBroadcast เพิ่มใน 0.1.4",
+      "d": "EN: Minimum client version that supports styled broadcasts (##bc|…). Older clients receive plain text instead, preventing raw control codes from appearing. | ID: Versi client minimum yang mendukung pengumuman berformat (##bc|…). Client lama menerima teks biasa agar kode kontrol tidak tampil mentah.",
       "v": "\"0.1.4\""
     },
     "SkipPrologueVideo": {
       "t": "bool",
-      "d": "[แก้เอง] 24 ส.ค. 2026 — ข้ามฉากรถไฟ/หนังเปิดตอนสร้างตัวละครใหม่ไหม (true = ข้าม) ค่านี้ถูกส่งไปให้ client ผ่าน /entry (ดู Gateway.cs) แล้ว client ตั้ง PrologueManager.ToBeSkipped ตามนี้เอง ⇒ **สลับได้จาก data/config.json โดยไม่ต้อง build/แจก client ใหม่เลย** (แก้ไฟล์นี้ รอ hot-reload 5 วิ พอผู้เล่นคนต่อไปเข้า /entry ก็ได้ค่าใหม่ทันที) default = true เพราะฉากรถไฟเต็มรูปแบบมี MediaPlayerCtrl เล่นวิดีโอที่ไฟล์หายไปจาก asset bundle ที่แจกอยู่ ⇒ ทำให้เกม \"ปิดตัวเองกะทันหัน\" ตอนผู้เล่นใหม่สร้างตัวละครครั้งแรก (เจอจากเทสแจกจริง)",
+      "d": "EN: Whether to skip the opening train video for new characters. This is sent through /entry and can be changed by editing config.json; default true because a required video asset is missing. | ID: Menentukan apakah video kereta pembuka untuk karakter baru dilewati. Nilai dikirim melalui /entry dan dapat diubah di config.json; default true karena aset video yang diperlukan tidak tersedia.",
       "v": "true"
     },
     "RegionTemplateId": {
       "t": "string",
-      "d": "[4 ก.ย. 2026] template ของภูมิภาคที่ส่งให้ client (Region.TemplateId) — client เอาไปแสดง \"เลเวลเกาะ\" (RegionTemplateData[TemplateId].Level) และไอคอนง่าย/ยากของสัตว์ · ว่าง = ใช้ region_template ของ terrain เช่น terrain ri35te → ri35teSub01 = Lv35 · ตั้ง \"ru10gr170511\" = เกาะโชว์ Lv10, \"ri15sa171228\" = Lv15 (ควรตั้ง Survival.RegionLevel ให้ตรงกับเลเวลนี้ด้วย เพื่อสูตรความล้า)",
+      "d": "EN: Region template reported to the client, used to display island level and animal difficulty icons. Leave empty to use the terrain's default template. Keep Survival.RegionLevel consistent. | ID: Template region yang dikirim ke client untuk menampilkan level pulau dan ikon kesulitan hewan. Kosongkan untuk memakai template bawaan terrain. Samakan dengan Survival.RegionLevel.",
       "v": "\"\""
     },
     "MaxOnlinePlayers": {
       "t": "int",
-      "d": "[3 ก.ย. 2026] เพดานจำนวนผู้เล่นออนไลน์พร้อมกัน (hot-reload ได้ แก้ไฟล์รอ 5 วิ มีผลทันที ไม่ต้องรีสตาร์ต) เดิมตั้งได้แค่ตอนเปิดเซิร์ฟด้วย --max-connections ⇒ อยากเพิ่มต้องรีสตาร์ต (ผู้เล่นหลุด) ค่านี้ชนะ --max-connections · ตั้ง &lt;= 0 = ใช้ค่าจาก flag เดิม (หรือ default โค้ด)",
+      "d": "EN: Maximum concurrent online players. Supports hot reload after about 5 seconds. Overrides --max-connections; values <= 0 use the command-line setting or code default. | ID: Maksimum pemain online bersamaan. Mendukung hot reload setelah sekitar 5 detik. Menggantikan --max-connections; nilai <= 0 memakai pengaturan command line atau default kode.",
       "v": "50"
     },
     "MaxPlayersPerIp": {
       "t": "int",
-      "d": "เพดานผู้เล่นจาก IP เดียวกัน (hot-reload) · &lt;= 0 = ใช้ค่าจาก flag เดิม",
+      "d": "EN: Maximum concurrent players from one IP address. Hot reload supported; values <= 0 use the existing command-line setting. | ID: Maksimum pemain bersamaan dari satu alamat IP. Mendukung hot reload; nilai <= 0 memakai pengaturan command line yang ada.",
       "v": "8"
     }
   },
   "World": {
     "ChunkSendRange": {
       "t": "int",
-      "d": "ส่งข้อมูลต้นไม้/หิน (garden) รอบ chunk ที่ client ขอมา กี่ chunk 1 = 3×3 (ของเดิม) · 2 = 5×5 · 1 chunk = 16 tile **ต้องเท่ากับ `_visibleRange` ของ client** (Durango.Terrain/TerrainBase.InitChunkPool) น้อยกว่า = chunk วงนอกไม่มีของ แล้วต้องสร้างใหม่ตอนเดินเข้าไปใกล้ = เห็นแมพรีเฟรช มากกว่า = เปลืองแบนด์วิดท์เปล่า ๆ เพราะ client ทิ้ง chunk ที่อยู่นอกระยะทันที client ต้นฉบับ (retail) ใช้ `range = 1` ตายตัว ⇒ ค่าปกติของเราคือ 1",
+      "d": "EN: Number of chunks around a requested chunk to send natural objects from. 1 = 3×3, 2 = 5×5; one chunk is 16 tiles. Must match the client's visible chunk range. Retail clients use 1. | ID: Jumlah lingkaran chunk di sekitar chunk yang diminta untuk mengirim objek alami. 1 = 3×3, 2 = 5×5; satu chunk berisi 16 tile. Harus cocok dengan jarak tampilan client. Client retail memakai 1.",
       "v": "1"
     },
     "NaturalRegrowSeconds": {
       "t": "double",
-      "d": "[regrow] ต้นไม้/หิน/บ่อโคลนที่ถูกเก็บจนหมดหรือทำลาย งอกกลับหลังกี่วินาที (0 = ไม่งอก หายถาวรเหมือนเดิม) เกมต้นฉบับใช้ eco simulation รายวัน — ของเราตั้ง 20 นาที ให้เกาะเทสไม่โล่ง",
+      "d": "EN: Seconds before fully gathered or destroyed trees, rocks, and mud pools regrow. 0 means they never regrow. The test server uses 20 minutes. | ID: Waktu dalam detik sebelum pohon, batu, dan genangan lumpur yang habis dikumpulkan atau dihancurkan tumbuh kembali. Nilai 0 berarti tidak tumbuh kembali. Server pengujian memakai 20 menit.",
       "v": "1200.0"
     },
     "ClientChunkRetainRange": {
       "t": "int",
-      "d": "client **เก็บ** chunk ไว้กี่วงรอบตัว (= `_visibleRange` ของ client จริง ๆ) 🐛 ต้นตออาการ \"เดินไปแล้วโลกไม่โหลด\": ตัวนี้เคยถูกอนุมานจาก `ChunkSendRange` พอตั้ง ChunkSendRange กว้างกว่าที่ client รับไหว (retail = 1) `ChunkPool.Load()` จะ **ทิ้ง chunk วงนอกเงียบ ๆ** (ไม่เข้า `_failedChunks` ด้วยซ้ำ) แต่เซิร์ฟจำว่า \"ส่งไปแล้ว\" ⇒ พอเดินข้ามขอบ chunk เซิร์ฟข้ามการส่งซ้ำ client จึงไม่เคยได้ก้อนนั้น และ `IsEnoughChunkLoaded()` (ต้องครบ 9) ไม่ผ่าน ⇒ `IsLoadingChunks` ค้าง true ถาวร terrain หยุดอัปเดตทั้งระบบ จึงแยกออกมาเป็นค่าของตัวเอง — และตั้งแต่ 30 ส.ค. 2026 เซิร์ฟ **ตรวจเองรายคน** จาก ModHello: client ที่มี `DurangoClientCore` ใช้ `ClientModPolicy.WorldChunkRange` (มอดขยาย pool ให้) ค่านี้จึงเหลือหน้าที่เดียว = **ระยะของ client เปล่า ๆ ที่ไม่มีมอด** (retail = 1 อย่าแก้)",
+      "d": "EN: Number of chunk rings the client retains around itself. Keep at 1 for unmodded retail clients; a mismatch can make the server believe chunks were sent even after the client discarded them, causing permanent unloaded areas. | ID: Jumlah lingkaran chunk yang disimpan client di sekitarnya. Pertahankan nilai 1 untuk client retail tanpa mod; nilai yang tidak cocok dapat membuat server mengira chunk sudah terkirim padahal client membuangnya, sehingga area tidak pernah termuat.",
       "v": "1"
     },
     "ViewRangeTiles": {
       "t": "float",
-      "d": "ระยะที่ **เริ่มเห็น** กัน (tile · 1 tile = 200 หน่วยโลก) ควรกว้างกว่าที่จอแสดงจริงเล็กน้อย เพื่อให้ข้อมูลไปถึงก่อนที่เป้าจะโผล่เข้าจอ",
+      "d": "EN: Distance at which entities become visible, in tiles (1 tile = 200 world units). Set slightly beyond the visible screen so updates arrive before an entity appears. | ID: Jarak saat entitas mulai terlihat, dalam tile (1 tile = 200 unit dunia). Atur sedikit lebih jauh dari layar agar data tiba sebelum entitas terlihat.",
       "v": "16"
     },
     "ViewMarginTiles": {
       "t": "float",
-      "d": "เลยระยะเห็นออกไปอีกเท่านี้ถึงจะ \"หายไป\" (tile) ต้องมีช่องว่างตรงนี้ ไม่งั้นคนที่ยืนอยู่พอดีขอบระยะจะ **โผล่-หาย-โผล่-หายรัว ๆ** ทุกครั้งที่ขยับไปมาไม่กี่ก้าว (ปัญหาคลาสสิกของระบบกรองระยะ)",
+      "d": "EN: Extra distance beyond the view range before entities disappear. This buffer prevents rapid appearing and disappearing near the visibility boundary. | ID: Jarak tambahan setelah batas tampilan sebelum entitas menghilang. Jarak penyangga ini mencegah entitas muncul dan hilang berulang di tepi jangkauan.",
       "v": "4"
     },
     "ViewCheckSeconds": {
       "t": "double",
-      "d": "ตรวจว่าใครเข้า/ออกระยะทุกกี่วินาที (ถี่ไป = เปลือง CPU · ห่างไป = คนโผล่ช้า)",
+      "d": "EN: Interval in seconds for checking which players enter or leave visibility range. Too frequent costs CPU; too slow delays visibility updates. | ID: Interval dalam detik untuk memeriksa pemain yang masuk atau keluar dari jangkauan tampilan. Terlalu sering membebani CPU; terlalu jarang menunda pembaruan tampilan.",
       "v": "0.4"
     },
     "ViewCulling": {
       "t": "bool",
-      "d": "ปิดการกรองระยะ = กลับไปส่งให้ทุกคนเหมือนเดิม (ไว้เทียบเวลาสงสัยว่าบั๊กมาจากตรงนี้ไหม)",
+      "d": "EN: Disable distance-based visibility filtering to send entities to everyone. Useful for diagnosing visibility bugs. | ID: Menonaktifkan penyaringan berdasarkan jarak sehingga entitas dikirim ke semua pemain. Berguna untuk mendiagnosis bug tampilan.",
       "v": "true"
     },
     "ResourceLevel": {
       "t": "int",
-      "d": "เลเวลของไม้/ผลไม้/หอย/หิน ที่เก็บได้บนเกาะนี้ 0 = ใช้ MinLevel ของเกาะ (หรือ 1 ถ้าเปิดแบบเกาะเดียว)",
+      "d": "EN: Level of harvestable wood, fruit, shells, and rocks on this island. 0 uses the island's MinLevel, or 1 in single-island mode. | ID: Level kayu, buah, kerang, dan batu yang dapat dikumpulkan di pulau ini. Nilai 0 memakai MinLevel pulau, atau 1 dalam mode satu pulau.",
       "v": "0"
     }
   },
@@ -581,215 +581,215 @@
     },
     "DurabilityBase": {
       "t": "float",
-      "d": "ความทนทานเต็ม = DurabilityBase + ระดับวัสดุ(1-3) × DurabilityPerTier",
+      "d": "EN: Maximum tool durability = DurabilityBase + material tier (1–3) × DurabilityPerTier. | ID: Daya tahan maksimum alat = DurabilityBase + tingkat bahan (1–3) × DurabilityPerTier.",
       "v": "20"
     },
     "DurabilityPerTier": {
       "t": "float",
-      "d": "ความทนทานเต็ม = DurabilityBase + ระดับวัสดุ(1-3) × DurabilityPerTier",
+      "d": "EN: Durability added per material tier in the formula DurabilityBase + tier (1–3) × DurabilityPerTier. | ID: Tambahan daya tahan per tingkat bahan pada rumus DurabilityBase + tingkat (1–3) × DurabilityPerTier.",
       "v": "20",
       "g": 1
     },
     "WearPerUse": {
       "t": "float",
-      "d": "ใช้ 1 ครั้ง (เก็บของ/แล่ซาก 1 ชิ้น) เสียความทนทานเท่าไร — ใช้เมื่อ Deltas ปิด",
+      "d": "EN: Durability lost per use, such as one gathering action or one butchering item. Used when Deltas is disabled. | ID: Daya tahan yang hilang setiap penggunaan, seperti satu aksi mengumpulkan atau satu item hasil sembelihan. Dipakai saat Deltas dinonaktifkan.",
       "v": "1"
     },
     "Deltas": {
       "t": "WearDeltaConfig",
-      "d": "[TodoList/03] หักตามชนิดงานตาม constants.durability.deltas ของเกม — ดู WearDeltaConfig",
+      "d": "EN: Uses the game's per-action durability deltas from constants.durability.deltas. See WearDeltaConfig. | ID: Menggunakan delta daya tahan per aksi dari constants.durability.deltas milik game. Lihat WearDeltaConfig.",
       "v": "WearDeltaConfig.Defaults()"
     }
   },
   "Features": {
     "Gathering": {
       "t": "bool",
-      "d": "เก็บของจากธรรมชาติ (ต้องมีเครื่องมือตามชนิด)",
+      "d": "EN: Allow gathering natural resources with the appropriate tool. | ID: Mengizinkan pengumpulan sumber daya alami menggunakan alat yang sesuai.",
       "v": "true"
     },
     "Crafting": {
       "t": "bool",
-      "d": "คราฟต์ของ/สิ่งปลูกสร้าง",
+      "d": "EN: Allow crafting items and structures. | ID: Mengizinkan pembuatan item dan struktur.",
       "v": "true"
     },
     "Combat": {
       "t": "bool",
-      "d": "ต่อสู้กับสัตว์",
+      "d": "EN: Enable combat with animals. | ID: Mengaktifkan pertarungan dengan hewan.",
       "v": "true"
     },
     "Butchery": {
       "t": "bool",
-      "d": "แล่ซากสัตว์",
+      "d": "EN: Allow butchering animal corpses. | ID: Mengizinkan penyembelihan bangkai hewan.",
       "v": "true"
     },
     "Building": {
       "t": "bool",
-      "d": "สร้างสิ่งปลูกสร้าง/กล่องเก็บของ",
+      "d": "EN: Allow building structures and storage containers. | ID: Mengizinkan pembangunan struktur dan wadah penyimpanan.",
       "v": "true"
     },
     "Progression": {
       "t": "bool",
-      "d": "เลเวล + exp + แต้มสกิล",
+      "d": "EN: Enable player levels, experience, and skill points. | ID: Mengaktifkan level pemain, pengalaman, dan poin skill.",
       "v": "true"
     },
     "Skills": {
       "t": "bool",
-      "d": "เรียน/ลืมสกิล",
+      "d": "EN: Allow learning and forgetting skills. | ID: Mengizinkan mempelajari dan melupakan skill.",
       "v": "true"
     },
     "Equipment": {
       "t": "bool",
-      "d": "สวมใส่อุปกรณ์",
+      "d": "EN: Allow equipping gear. | ID: Mengizinkan penggunaan perlengkapan.",
       "v": "true"
     },
     "Survival": {
       "t": "bool",
-      "d": "เลือด/สตามินา/ความล้า",
+      "d": "EN: Enable health, stamina, and fatigue systems. | ID: Mengaktifkan sistem darah, stamina, dan kelelahan.",
       "v": "true"
     },
     "ToolDurability": {
       "t": "bool",
-      "d": "ความทนทานเครื่องมือ (ตรงกับ \"ไอเทมทุกอย่างมี durability\" ในรายการ)",
+      "d": "EN: Enable tool durability. | ID: Mengaktifkan daya tahan alat.",
       "v": "true"
     },
     "Chat": {
       "t": "bool",
-      "d": "แชทช่องรวม",
+      "d": "EN: Enable the global chat channel. | ID: Mengaktifkan kanal obrolan global.",
       "v": "true"
     },
     "IslandTravel": {
       "t": "bool",
-      "d": "เดินทางข้ามเกาะในเกม (ท่าเรือ/วาร์ปโฮล) — โค้ดมีแล้วแต่ยังไม่ได้เทสในเกม",
+      "d": "EN: Enable travel between islands via ports and warp holes. Implemented but not yet fully tested in-game. | ID: Mengaktifkan perjalanan antarpulau melalui pelabuhan dan warp hole. Sudah diimplementasikan tetapi belum diuji sepenuhnya di game.",
       "v": "false"
     },
     "Jobs": {
       "t": "bool",
-      "d": "อาชีพเดิมจากโลกจริง (เลือกตอน Lv.10)",
+      "d": "EN: Enable original-world jobs selected at player level 10. | ID: Mengaktifkan profesi dari game asli yang dipilih pada level pemain 10.",
       "v": "true"
     },
     "Cooking": {
       "t": "bool",
-      "d": "ทำอาหาร",
+      "d": "EN: Enable cooking. | ID: Mengaktifkan memasak.",
       "v": "true"
     },
     "Farming": {
       "t": "bool",
-      "d": "เพาะปลูก/ทำนา",
+      "d": "EN: Enable farming and crop cultivation. | ID: Mengaktifkan pertanian dan budidaya tanaman.",
       "v": "true"
     },
     "Livestock": {
       "t": "bool",
-      "d": "เลี้ยงปศุสัตว์ (ให้นม)",
+      "d": "EN: Enable livestock raising and milking. | ID: Mengaktifkan pemeliharaan ternak dan pemerahan susu.",
       "v": "false"
     },
     "Taming": {
       "t": "bool",
-      "d": "จับ/ขี่ไดโนเสาร์",
+      "d": "EN: Enable dinosaur taming and riding. | ID: Mengaktifkan penjinakan dan menunggangi dinosaurus.",
       "v": "false"
     },
     "Market": {
       "t": "bool",
-      "d": "ตลาดซื้อขายระหว่างผู้เล่น",
+      "d": "EN: Enable the player-to-player marketplace. | ID: Mengaktifkan pasar antarpemain.",
       "v": "false"
     },
     "WarpAccelerator": {
       "t": "bool",
-      "d": "รอยแยก/วาร์ปเรกเซเลอเรเตอร์ (blueprint \"warp_accelerator\") — กิจกรรม PvE ป้องกันคลื่นสัตว์ เขียนใหม่ทั้งหมด 22 ส.ค. 2026 (ArtifactFactory + WarpAcceleratorManager + ServerPlayer.WarpAccelerator) ยังไม่เคยเทสในเกมจริงสักครั้ง (เซิร์ฟหลักกำลังรันสดคู่ขนาน ห้าม restart ทดสอบ) ⇒ ปิดไว้ก่อน เหมือน Livestock/Taming/Market — เปิดเองตอนพร้อมทดสอบ (แก้ data/config.json หรือ FeatureConfig.Defaults)",
+      "d": "EN: Enables the Warp Accelerator PvE event, where players defend against waves of animals. Implemented but not yet tested in a live game; keep disabled until testing is ready. | ID: Mengaktifkan event PvE Warp Accelerator, tempat pemain bertahan dari gelombang hewan. Sudah diimplementasikan tetapi belum diuji di game live; tetap nonaktif sampai siap diuji.",
       "v": "false"
     },
     "Quests": {
       "t": "bool",
-      "d": "เควสจาก 4 กลุ่ม NPC",
+      "d": "EN: Enable quests from four NPC groups. | ID: Mengaktifkan misi dari empat kelompok NPC.",
       "v": "true"
     },
     "QuestChecklist": {
       "t": "bool",
-      "d": "เอา \"เควสประจำวัน\" (เดิม: รายการตรวจเซิร์ฟ) มาใส่เป็นเควส (ดู QuestData.Checklist) ปิดตัวนี้เมื่อเทสผ่านหมดแล้ว — เควสชุดตรวจจะหายไปทันทีโดยไม่กระทบสายสอนเล่น",
+      "d": "EN: Adds server test checks as daily quests. Disable after all tests pass; these test quests disappear without affecting tutorial quests. | ID: Menambahkan pemeriksaan server sebagai misi harian. Nonaktifkan setelah semua tes lolos; misi pengujian akan hilang tanpa memengaruhi misi tutorial.",
       "v": "true"
     },
     "Pvp": {
       "t": "bool",
-      "d": "PK บนเกาะ Lv.20+",
+      "d": "EN: Enable player killing on islands level 20 and above. | ID: Mengaktifkan PvP di pulau level 20 ke atas.",
       "v": "false"
     },
     "LandPermission": {
       "t": "bool",
-      "d": "สิทธิ์ในที่ดินส่วนตัว (เฉพาะเรา/เพื่อน/สาธารณะ)",
+      "d": "EN: Private-land permissions: owner only, friends, or public. | ID: Hak akses tanah pribadi: pemilik saja, teman, atau publik.",
       "v": "true"
     },
     "PartyAndClan": {
       "t": "bool",
-      "d": "ปาร์ตี้/แคลน",
+      "d": "EN: Enable parties and clans. | ID: Mengaktifkan party dan clan.",
       "v": "false"
     },
     "Emotes": {
       "t": "bool",
-      "d": "ท่าทาง/อีโมติคอนของผู้เล่น (ไม่ได้อยู่ในรายการ LBT1)",
+      "d": "EN: Enable player emotes, which are not included in the LBT1 feature list. | ID: Mengaktifkan emote pemain yang tidak termasuk dalam daftar fitur LBT1.",
       "v": "false"
     },
     "Friends": {
       "t": "bool",
-      "d": "ระบบเพื่อน (ส่ง/ตอบรับ/ยกเลิกคำขอ จัดประเภทเพื่อน ติดตาม)",
+      "d": "EN: Enable friend requests, acceptance, cancellation, friend categories, and following. | ID: Mengaktifkan permintaan teman, penerimaan, pembatalan, kategori teman, dan fitur mengikuti.",
       "v": "false"
     },
     "Mail": {
       "t": "bool",
-      "d": "ระบบจดหมาย (ส่งข้อความ/ของแนบ รับ/ลบ/ทำเครื่องหมายอ่าน)",
+      "d": "EN: Enable mail with messages and attachments, including receiving, deleting, and marking as read. | ID: Mengaktifkan surat berisi pesan dan lampiran, termasuk menerima, menghapus, dan menandai telah dibaca.",
       "v": "false"
     },
     "Wallet": {
       "t": "bool",
-      "d": "ระบบกระเป๋าเงิน (โอน DurangoCoin ระหว่างผู้เล่น)",
+      "d": "EN: Enable the player wallet and DurangoCoin transfers. | ID: Mengaktifkan dompet pemain dan transfer DurangoCoin.",
       "v": "false"
     },
     "Factions": {
       "t": "bool",
-      "d": "กลุ่ม Faction (เข้าร่วม ทำภารกิจรายวัน สนับสนุน)",
+      "d": "EN: Enable factions, including joining, daily missions, and support. | ID: Mengaktifkan faction, termasuk bergabung, misi harian, dan dukungan.",
       "v": "false"
     },
     "Missions": {
       "t": "bool",
-      "d": "ระบบเควส/ภารกิจ (เข้าร่วม/ยกเลิก/สลับ/ชาร์จ)",
+      "d": "EN: Enable missions, including joining, cancelling, switching, and charging. | ID: Mengaktifkan misi, termasuk bergabung, membatalkan, mengganti, dan mengisi daya.",
       "v": "false"
     },
     "Attendance": {
       "t": "bool",
-      "d": "ระบบเข้าร่วมประจำวัน (รับรางวัล/ของแถม)",
+      "d": "EN: Enable daily attendance and its rewards. | ID: Mengaktifkan kehadiran harian dan hadiahnya.",
       "v": "false"
     },
     "Cargo": {
       "t": "bool",
-      "d": "ระบบขนส่ง/คลังสินค้า (เปิดปิดประตู ส่งของ ป้องกันรู)",
+      "d": "EN: Enable cargo and warehouse systems, including gates, deliveries, and defense. | ID: Mengaktifkan sistem kargo dan gudang, termasuk gerbang, pengiriman, dan pertahanan.",
       "v": "false"
     },
     "Archipelago": {
       "t": "bool",
-      "d": "ระบบหมู่เกาะ (ท้าทาย/ทำความสะอาด/ล้างพื้นที่/วาร์ป)",
+      "d": "EN: Enable archipelago activities, including challenges, cleanup, clearing areas, and warping. | ID: Mengaktifkan aktivitas kepulauan, termasuk tantangan, pembersihan, pengosongan area, dan warp.",
       "v": "false"
     },
     "Band": {
       "t": "bool",
-      "d": "ระบบเพลง/ดนตรี (เล่น/หยุด/แชร์/บันทึก)",
+      "d": "EN: Enable music and band features: play, stop, share, and save. | ID: Mengaktifkan fitur musik: memutar, menghentikan, berbagi, dan menyimpan.",
       "v": "false"
     },
     "AddOns": {
       "t": "bool",
-      "d": "ระบบ AddOns (วาง/ซื้อ DLC)",
+      "d": "EN: Enable add-ons, placement, and DLC purchases. | ID: Mengaktifkan add-on, penempatan, dan pembelian DLC.",
       "v": "false"
     },
     "DyeAndBleach": {
       "t": "bool",
-      "d": "ระบบย้อม/ฟอกสีไอเทม",
+      "d": "EN: Enable item dyeing and bleaching. | ID: Mengaktifkan pewarnaan dan pemutihan item.",
       "v": "false"
     },
     "PrivateConversation": {
       "t": "bool",
-      "d": "แชทส่วนตัว/สร้าง/เข้าร่วมห้องสนทนา (ต้อง auth ผ่าน Tune ก่อน)",
+      "d": "EN: Enable private conversations and creating or joining rooms; Tune authentication is required. | ID: Mengaktifkan percakapan pribadi serta pembuatan atau keikutsertaan dalam ruang; autentikasi Tune diperlukan.",
       "v": "false"
     },
     "MaxPlayerLevel": {
       "t": "int",
-      "d": "เพดานเลเวลผู้เล่น — 0 = ไม่จำกัด (ใช้เพดานเต็มของเกม = 60, constants.max_levels.player) beta 1.0.0 เคยล็อกไว้ที่ 20 ตาม LBT1 ของเกมต้นฉบับ (\"ปล่อยคอนเทนต์แค่ Lv.1-20\") ปลดเมื่อ 3 ก.ย. 2026 (TodoList/01) — ตารางสูตร/blueprint/สัตว์มีครบถึง 60 อยู่แล้ว เลเวลสัตว์ไม่ผูกกับค่านี้ (remap ตาม MinLevel/MaxLevel ของแต่ละเกาะ) ใส่ตัวเลข 1-60 ถ้าอยากล็อกรอบเทสเป็นพิเศษ",
+      "d": "EN: Maximum player level. 0 means no custom cap (the game's maximum is 60). Set 1–60 to cap a test session. Animal levels are controlled by each island's MinLevel/MaxLevel instead. | ID: Level maksimum pemain. Nilai 0 berarti tanpa batas khusus (maksimum game 60). Atur 1–60 untuk membatasi sesi pengujian. Level hewan diatur oleh MinLevel/MaxLevel tiap pulau.",
       "v": "0"
     }
   },
@@ -823,12 +823,12 @@
     },
     "StaminaRegenDelaySeconds": {
       "t": "float",
-      "d": "ใช้สตามินาแล้วต้องรอกี่วินาทีถึงเริ่มฟื้น **สำคัญกับความรู้สึกมาก** — ไม่มีตัวนี้ (ฟื้นทันที 4/วิ) การเก็บของ 1 ครั้งใช้เวลา 2-3 วิ ซึ่งฟื้นคืน 8-12 แต่หักแค่ 6 ⇒ เก็บรัวแค่ไหนสตามินาก็ไม่มีวันหมด = ระบบไม่มีความหมาย (วัดจริงด้วย --stamina-check แล้ว: เก็บรัว 25 ครั้งยังเหลือ 88) ตั้งให้นานกว่าเวลาเก็บของ 1 ครั้ง สตามินาจึงจะลดจริงตอนทำงานต่อเนื่อง",
+      "d": "EN: Delay after spending stamina before regeneration starts. Without a delay, gathering may regenerate more stamina than it costs, making stamina effectively unlimited. Set longer than one gathering action to make continuous work consume stamina. | ID: Jeda setelah stamina digunakan sebelum regenerasi dimulai. Tanpa jeda, pengumpulan dapat memulihkan stamina lebih banyak daripada yang digunakan sehingga stamina terasa tidak terbatas. Atur lebih lama daripada satu aksi mengumpulkan agar kerja berkelanjutan menghabiskan stamina.",
       "v": "4"
     },
     "StaminaRegenWhileResting": {
       "t": "float",
-      "d": "นั่งพักที่กองไฟ = สตามินาฟื้นเร็วขึ้นเป็นวินาทีละเท่านี้ (แทนอัตราปกติ) ตั้งใจให้ \"ยืนรอเฉย ๆ ฟื้นช้ามาก แต่นั่งพักที่กองไฟฟื้นไว\" ⇒ มีเหตุผลให้กลับบ้าน",
+      "d": "EN: Stamina regenerated per second while resting at a campfire, replacing the normal rate. Intended to make resting at home more useful than standing idle. | ID: Stamina yang pulih per detik saat beristirahat di api unggun, menggantikan laju normal. Dirancang agar beristirahat di rumah lebih berguna daripada diam saja.",
       "v": "10"
     },
     "StaminaCostCollect": {
@@ -853,191 +853,191 @@
     },
     "FatiguePerSec": {
       "t": "float",
-      "d": "ล้าขึ้นเองตามเวลา (ค่าเริ่มต้น = เต็มใน 1 ชั่วโมง)",
+      "d": "EN: Fatigue gained automatically over time; the default reaches full fatigue in about one hour. | ID: Kelelahan yang bertambah otomatis seiring waktu; nilai default mencapai kelelahan penuh dalam sekitar satu jam.",
       "v": "100 / 3600"
     },
     "FatiguePerAction": {
       "t": "float",
-      "d": "ทำงาน 1 ครั้ง (เก็บของ/คราฟต์/สร้าง) ล้าเพิ่มเท่าไร — อยู่เฉย ๆ กับทำงานต้องต่างกัน",
+      "d": "EN: Additional fatigue per action such as gathering, crafting, or building. Keeps active work distinct from idling. | ID: Kelelahan tambahan per aksi seperti mengumpulkan, crafting, atau membangun. Membuat aktivitas berbeda dari diam saja.",
       "v": "0.35"
     },
     "FatigueCaution": {
       "t": "float",
-      "d": "ถึงระดับนี้ = ทำอะไรก็เปลืองสตามินา 1.5 เท่า",
+      "d": "EN: At this fatigue level, actions cost 1.5× stamina. | ID: Pada tingkat kelelahan ini, aksi menggunakan stamina 1,5 kali lipat.",
       "v": "60"
     },
     "FatigueDanger": {
       "t": "float",
-      "d": "ถึงระดับนี้ = เปลือง 2 เท่า และเลือดหยุดฟื้น",
+      "d": "EN: At this fatigue level, actions cost 2× stamina and health regeneration stops. | ID: Pada tingkat kelelahan ini, aksi menggunakan stamina 2 kali lipat dan regenerasi darah berhenti.",
       "v": "85"
     },
     "LifeMax": {
       "t": "float",
-      "d": "เลือดสูงสุด **ที่เลเวล 1** — ของจริงบวกด้วยเลเวลและความอดทน (ดู LifePerLevel)",
+      "d": "EN: Maximum health at player level 1. Actual maximum health also increases with level and endurance; see LifePerLevel. | ID: Darah maksimum pada level pemain 1. Darah maksimum sebenarnya juga bertambah berdasarkan level dan endurance; lihat LifePerLevel.",
       "v": "100"
     },
     "LifeRegenPerSec": {
       "t": "float",
-      "d": "เลือดสูงสุด **ที่เลเวล 1** — ของจริงบวกด้วยเลเวลและความอดทน (ดู LifePerLevel)",
+      "d": "EN: Health regeneration per second. Maximum health scales with level and endurance; see LifePerLevel. | ID: Regenerasi darah per detik. Darah maksimum meningkat berdasarkan level dan endurance; lihat LifePerLevel.",
       "v": "0.5",
       "g": 1
     },
     "LifePerLevel": {
       "t": "float",
-      "d": "เลือดสูงสุดเพิ่มต่อ 1 เลเวลผู้เล่น",
+      "d": "EN: Maximum health gained per player level. | ID: Tambahan darah maksimum setiap level pemain.",
       "v": "2"
     },
     "LifePerEndurance": {
       "t": "float",
-      "d": "เลือดสูงสุดเพิ่มต่อ 1 หน่วยความอดทน (Endurance)",
+      "d": "EN: Maximum health gained per point of Endurance. | ID: Tambahan darah maksimum setiap poin Endurance.",
       "v": "0.8"
     },
     "StaminaPerLevel": {
       "t": "float",
-      "d": "สตามินาสูงสุดเพิ่มต่อ 1 เลเวลผู้เล่น",
+      "d": "EN: Maximum stamina gained per player level. | ID: Tambahan stamina maksimum setiap level pemain.",
       "v": "1"
     },
     "StaminaPerWill": {
       "t": "float",
-      "d": "สตามินาสูงสุดเพิ่มต่อ 1 หน่วยความมุ่งมั่น (Will)",
+      "d": "EN: Maximum stamina gained per point of Will. | ID: Tambahan stamina maksimum setiap poin Will.",
       "v": "0.5"
     },
     "LifeDrainWhenExhausted": {
       "t": "float",
-      "d": "ล้าเต็มหลอด = เลือดไหลลงวินาทีละเท่านี้ (0 = ปิด ล้าเต็มแล้วก็แค่เปลืองสตามินา) ค่าเริ่มต้น 0.6 ⇒ จากเลือดเต็มถึงตายใช้เวลา ~2 นาทีครึ่ง — พอให้วิ่งกลับไปกองไฟทัน",
+      "d": "EN: Health lost per second at maximum fatigue. 0 disables health drain; default 0.6 gives players roughly 2.5 minutes to reach a campfire. | ID: Darah yang berkurang per detik saat kelelahan penuh. Nilai 0 menonaktifkan pengurangan darah; default 0,6 memberi pemain sekitar 2,5 menit untuk mencapai api unggun.",
       "v": "0.6"
     },
     "RestFatiguePerSec": {
       "t": "float",
-      "d": "[เลิกใช้ 3 ก.ย. 2026] พักที่กองไฟแล้วความล้าลดวินาทีละเท่าไร — ตอนนี้ใช้สูตรของเกมจริงแทน (RestFatigueBase + RestFatiguePerLevel) เหลือไว้แค่เป็นสวิตช์ปิด/เปิด",
+      "d": "EN: Legacy setting, retained as a toggle. Resting fatigue recovery now uses the game's RestFatigueBase + RestFatiguePerLevel formula. | ID: Pengaturan lama yang dipertahankan sebagai sakelar. Pemulihan kelelahan saat istirahat kini menggunakan rumus game RestFatigueBase + RestFatiguePerLevel.",
       "v": "4"
     },
     "RestRangeTiles": {
       "t": "float",
-      "d": "ต้องอยู่ห่างกองไฟไม่เกินกี่ tile ถึงจะพักได้",
+      "d": "EN: Maximum distance in tiles from a campfire to qualify for resting. | ID: Jarak maksimum dalam tile dari api unggun agar pemain dapat beristirahat.",
       "v": "3"
     },
     "FatigueVelocityBase": {
       "t": "float",
-      "d": "อัตราความล้าพื้นฐาน — สูตรจริงจาก constants.json → fatigue_velocity: (0.04 + 0.001 × เลเวลตัวละคร) × max(0.5, 1 − 0.05 × (เลเวลตัวละคร − เลเวลเกาะ)) สองค่านี้คือ 0.04 กับ 0.001",
+      "d": "EN: Base fatigue velocity from constants.json: (0.04 + 0.001 × character level) × max(0.5, 1 − 0.05 × (character level − island level)). This value is 0.04. | ID: Kecepatan dasar kelelahan dari constants.json: (0,04 + 0,001 × level karakter) × max(0,5, 1 − 0,05 × (level karakter − level pulau)). Nilai ini 0,04.",
       "v": "0.04"
     },
     "FatigueVelocityPerLevel": {
       "t": "float",
-      "d": "อัตราความล้าพื้นฐาน — สูตรจริงจาก constants.json → fatigue_velocity: (0.04 + 0.001 × เลเวลตัวละคร) × max(0.5, 1 − 0.05 × (เลเวลตัวละคร − เลเวลเกาะ)) สองค่านี้คือ 0.04 กับ 0.001",
+      "d": "EN: Per-level fatigue velocity coefficient in the constants.json formula; this value is 0.001. | ID: Koefisien kecepatan kelelahan per level dalam rumus constants.json; nilainya 0,001.",
       "v": "0.001",
       "g": 1
     },
     "RegionLevel": {
       "t": "int",
-      "d": "เลเวลของเกาะ (rl ในสูตร) — เกาะเริ่มต้น = 1 · ยิ่งเลเวลผู้เล่นสูงกว่าเกาะ ยิ่งล้าช้าลง",
+      "d": "EN: Island level used by fatigue formulas. The starting island is level 1; higher player levels relative to the island reduce fatigue buildup. | ID: Level pulau yang digunakan rumus kelelahan. Pulau awal level 1; level pemain yang lebih tinggi daripada level pulau memperlambat penumpukan kelelahan.",
       "v": "1"
     },
     "FatigueCostCollect": {
       "t": "float",
-      "d": "ความล้าต่อการกระทำ — สูตรจริงจาก constants.json → fatigue_cost (e = สตามินาที่การกระทำนั้นใช้): เก็บของ 0.4·√e · คราฟต์ 2·√e · ก่อสร้าง 4·√e · ต่อสู้ 4·e · อย่างอื่น e",
+      "d": "EN: Fatigue cost per action from constants.json, where e is stamina cost: gathering 0.4·√e, crafting 2·√e, building 4·√e, combat 4·e, other actions e. | ID: Biaya kelelahan per aksi dari constants.json, dengan e sebagai biaya stamina: mengumpulkan 0,4·√e, crafting 2·√e, membangun 4·√e, bertarung 4·e, aksi lain e.",
       "v": "0.4"
     },
     "FatigueCostCraft": {
       "t": "float",
-      "d": "ความล้าต่อการกระทำ — สูตรจริงจาก constants.json → fatigue_cost (e = สตามินาที่การกระทำนั้นใช้): เก็บของ 0.4·√e · คราฟต์ 2·√e · ก่อสร้าง 4·√e · ต่อสู้ 4·e · อย่างอื่น e",
+      "d": "EN: Fatigue cost per action from constants.json, where e is stamina cost: gathering 0.4·√e, crafting 2·√e, building 4·√e, combat 4·e, other actions e. | ID: Biaya kelelahan per aksi dari constants.json, dengan e sebagai biaya stamina: mengumpulkan 0,4·√e, crafting 2·√e, membangun 4·√e, bertarung 4·e, aksi lain e.",
       "v": "2",
       "g": 1
     },
     "FatigueCostBuild": {
       "t": "float",
-      "d": "ความล้าต่อการกระทำ — สูตรจริงจาก constants.json → fatigue_cost (e = สตามินาที่การกระทำนั้นใช้): เก็บของ 0.4·√e · คราฟต์ 2·√e · ก่อสร้าง 4·√e · ต่อสู้ 4·e · อย่างอื่น e",
+      "d": "EN: Fatigue cost per action from constants.json, where e is stamina cost: gathering 0.4·√e, crafting 2·√e, building 4·√e, combat 4·e, other actions e. | ID: Biaya kelelahan per aksi dari constants.json, dengan e sebagai biaya stamina: mengumpulkan 0,4·√e, crafting 2·√e, membangun 4·√e, bertarung 4·e, aksi lain e.",
       "v": "1.2",
       "g": 1
     },
     "FatigueCostCombat": {
       "t": "float",
-      "d": "ความล้าต่อการกระทำ — สูตรจริงจาก constants.json → fatigue_cost (e = สตามินาที่การกระทำนั้นใช้): เก็บของ 0.4·√e · คราฟต์ 2·√e · ก่อสร้าง 4·√e · ต่อสู้ 4·e · อย่างอื่น e",
+      "d": "EN: Fatigue cost per action from constants.json, where e is stamina cost: gathering 0.4·√e, crafting 2·√e, building 4·√e, combat 4·e, other actions e. | ID: Biaya kelelahan per aksi dari constants.json, dengan e sebagai biaya stamina: mengumpulkan 0,4·√e, crafting 2·√e, membangun 4·√e, bertarung 4·e, aksi lain e.",
       "v": "0.4",
       "g": 1
     },
     "RestFatigueBase": {
       "t": "float",
-      "d": "พักผ่อน — สูตรจริงจาก status_effects.json → rest: ความล้า −(0.15 + 0.0015 × level) · เลือด 0.45 + 0.05 × level (level = เลเวลของบัพ ซึ่งอิงคุณภาพที่นอน/กองไฟ — ตอนนี้เราใช้ 1 ทุกจุด)",
+      "d": "EN: Resting formula from status_effects.json: fatigue decreases by (0.15 + 0.0015 × buff level); health increases by (0.45 + 0.05 × buff level). Current server uses level 1. | ID: Rumus istirahat dari status_effects.json: kelelahan berkurang sebesar (0,15 + 0,0015 × level buff); darah bertambah sebesar (0,45 + 0,05 × level buff). Server saat ini menggunakan level 1.",
       "v": "0.3"
     },
     "RestFatiguePerLevel": {
       "t": "float",
-      "d": "พักผ่อน — สูตรจริงจาก status_effects.json → rest: ความล้า −(0.15 + 0.0015 × level) · เลือด 0.45 + 0.05 × level (level = เลเวลของบัพ ซึ่งอิงคุณภาพที่นอน/กองไฟ — ตอนนี้เราใช้ 1 ทุกจุด)",
+      "d": "EN: Per-level coefficient for fatigue recovery while resting; see the rest formula in status_effects.json. | ID: Koefisien per level untuk pemulihan kelelahan saat istirahat; lihat rumus rest di status_effects.json.",
       "v": "0.003",
       "g": 1
     },
     "RestLifeBase": {
       "t": "float",
-      "d": "พักผ่อน — สูตรจริงจาก status_effects.json → rest: ความล้า −(0.15 + 0.0015 × level) · เลือด 0.45 + 0.05 × level (level = เลเวลของบัพ ซึ่งอิงคุณภาพที่นอน/กองไฟ — ตอนนี้เราใช้ 1 ทุกจุด)",
+      "d": "EN: Resting health recovery formula from status_effects.json: 0.45 + 0.05 × buff level. Current server uses level 1. | ID: Rumus pemulihan darah saat istirahat dari status_effects.json: 0,45 + 0,05 × level buff. Server saat ini menggunakan level 1.",
       "v": "0.45",
       "g": 1
     },
     "RestLifePerLevel": {
       "t": "float",
-      "d": "พักผ่อน — สูตรจริงจาก status_effects.json → rest: ความล้า −(0.15 + 0.0015 × level) · เลือด 0.45 + 0.05 × level (level = เลเวลของบัพ ซึ่งอิงคุณภาพที่นอน/กองไฟ — ตอนนี้เราใช้ 1 ทุกจุด)",
+      "d": "EN: Per-level coefficient for health recovery while resting; see the rest formula in status_effects.json. | ID: Koefisien per level untuk pemulihan darah saat istirahat; lihat rumus rest di status_effects.json.",
       "v": "0.05",
       "g": 1
     },
     "ThirstSeconds": {
       "t": "float",
-      "d": "กระหายน้ำ (thirsty) — จาก status_effects.json: อยู่ได้ 180 วินาที เพิ่มความล้า 0.2 ในหมวด default และ arid ⚠️ ต้นฉบับ **ไม่มีหลอดความหิวของผู้เล่น** — มีแต่ satiety_high (อิ่มเกินกินไม่ลง) ส่วน Derived.HungryMax/HungryVelocity เป็นของสัตว์เลี้ยง (ดู constants.json → pet/battle)",
+      "d": "EN: Duration of the thirsty effect (180 seconds in the game). It adds 0.2 fatigue in default and arid categories. The original game has no player hunger bar; satiety_high only prevents eating too frequently. | ID: Durasi efek haus (180 detik di game). Efek ini menambah 0,2 kelelahan pada kategori default dan arid. Game asli tidak memiliki bar lapar pemain; satiety_high hanya mencegah makan terlalu sering.",
       "v": "180"
     },
     "ThirstFatigue": {
       "t": "float",
-      "d": "กระหายน้ำ (thirsty) — จาก status_effects.json: อยู่ได้ 180 วินาที เพิ่มความล้า 0.2 ในหมวด default และ arid ⚠️ ต้นฉบับ **ไม่มีหลอดความหิวของผู้เล่น** — มีแต่ satiety_high (อิ่มเกินกินไม่ลง) ส่วน Derived.HungryMax/HungryVelocity เป็นของสัตว์เลี้ยง (ดู constants.json → pet/battle)",
+      "d": "EN: Fatigue added by the thirsty effect; see ThirstSeconds. The original game has no player hunger bar. | ID: Kelelahan tambahan dari efek haus; lihat ThirstSeconds. Game asli tidak memiliki bar lapar pemain.",
       "v": "0.2",
       "g": 1
     },
     "DrinkWaterSeconds": {
       "t": "float",
-      "d": "ดื่มน้ำแล้วได้บัพ drink_water — 180 วินาที ลดความล้าหมวดร้อน 0.3",
+      "d": "EN: Duration of the drink_water buff after drinking water: 180 seconds. It reduces fatigue in hot categories by 0.3. | ID: Durasi buff drink_water setelah minum air: 180 detik. Efek ini mengurangi kelelahan pada kategori panas sebesar 0,3.",
       "v": "180"
     },
     "DrinkWaterFatigue": {
       "t": "float",
-      "d": "ดื่มน้ำแล้วได้บัพ drink_water — 180 วินาที ลดความล้าหมวดร้อน 0.3",
+      "d": "EN: Fatigue reduction from the drink_water buff in hot categories. | ID: Pengurangan kelelahan dari buff drink_water pada kategori panas.",
       "v": "-0.3",
       "g": 1
     },
     "BuildSiteEnergyBase": {
       "t": "float",
-      "d": "สตามินาต่อการกระทำ — **สูตรจริงจาก constants.json** (ไม่ใช่ค่าที่เราตั้งเอง) จองที่สร้าง 1 + (พื้นที่ช่อง × 2) · ลงมือสร้าง 1 · ทุบ 10 + ความทนทาน/2 ค่าเก่าของเราคือ 8 เท่ากันหมดทุกอย่าง ซึ่งแพงกว่าต้นฉบับหลายเท่า",
+      "d": "EN: Building stamina costs based on constants.json: reserve a site costs 1 + (tile area × 2), building costs 1, and demolition costs 10 + durability/2. | ID: Biaya stamina membangun berdasarkan constants.json: memesan lokasi membutuhkan 1 + (luas tile × 2), membangun membutuhkan 1, dan menghancurkan membutuhkan 10 + durability/2.",
       "v": "1"
     },
     "BuildSiteEnergyPerArea": {
       "t": "float",
-      "d": "สตามินาต่อการกระทำ — **สูตรจริงจาก constants.json** (ไม่ใช่ค่าที่เราตั้งเอง) จองที่สร้าง 1 + (พื้นที่ช่อง × 2) · ลงมือสร้าง 1 · ทุบ 10 + ความทนทาน/2 ค่าเก่าของเราคือ 8 เท่ากันหมดทุกอย่าง ซึ่งแพงกว่าต้นฉบับหลายเท่า",
+      "d": "EN: Additional stamina cost per tile area when reserving a building site, based on constants.json. | ID: Biaya stamina tambahan per luas tile saat memesan lokasi bangunan, berdasarkan constants.json.",
       "v": "2",
       "g": 1
     },
     "BuildEnergy": {
       "t": "float",
-      "d": "สตามินาต่อการกระทำ — **สูตรจริงจาก constants.json** (ไม่ใช่ค่าที่เราตั้งเอง) จองที่สร้าง 1 + (พื้นที่ช่อง × 2) · ลงมือสร้าง 1 · ทุบ 10 + ความทนทาน/2 ค่าเก่าของเราคือ 8 เท่ากันหมดทุกอย่าง ซึ่งแพงกว่าต้นฉบับหลายเท่า",
+      "d": "EN: Stamina cost to place/build a structure, based on constants.json. | ID: Biaya stamina untuk menempatkan atau membangun struktur, berdasarkan constants.json.",
       "v": "1",
       "g": 1
     },
     "DestructEnergyBase": {
       "t": "float",
-      "d": "สตามินาต่อการกระทำ — **สูตรจริงจาก constants.json** (ไม่ใช่ค่าที่เราตั้งเอง) จองที่สร้าง 1 + (พื้นที่ช่อง × 2) · ลงมือสร้าง 1 · ทุบ 10 + ความทนทาน/2 ค่าเก่าของเราคือ 8 เท่ากันหมดทุกอย่าง ซึ่งแพงกว่าต้นฉบับหลายเท่า",
+      "d": "EN: Base stamina cost for demolishing a structure, based on constants.json. | ID: Biaya stamina dasar untuk menghancurkan struktur, berdasarkan constants.json.",
       "v": "10",
       "g": 1
     },
     "DestructEnergyPerDurability": {
       "t": "float",
-      "d": "สตามินาต่อการกระทำ — **สูตรจริงจาก constants.json** (ไม่ใช่ค่าที่เราตั้งเอง) จองที่สร้าง 1 + (พื้นที่ช่อง × 2) · ลงมือสร้าง 1 · ทุบ 10 + ความทนทาน/2 ค่าเก่าของเราคือ 8 เท่ากันหมดทุกอย่าง ซึ่งแพงกว่าต้นฉบับหลายเท่า",
+      "d": "EN: Additional demolition stamina cost based on structure durability, from constants.json. | ID: Biaya stamina tambahan untuk menghancurkan struktur berdasarkan durability, dari constants.json.",
       "v": "0.5",
       "g": 1
     },
     "SatietyMax": {
       "t": "float",
-      "d": "อิ่มจนกินต่อไม่ได้ (satiety_high) — ความอิ่มเต็ม 100 · ลดลงเองวินาทีละเท่านี้ ไม่ใช่หลอดโชว์ผู้เล่น ใช้กันกินรัวอย่างเดียวเหมือนต้นฉบับ",
+      "d": "EN: Maximum satiety_high value (100). This is not a visible player bar; it only limits how frequently a player can eat. | ID: Nilai maksimum satiety_high (100). Ini bukan bar yang ditampilkan kepada pemain; hanya membatasi seberapa sering pemain dapat makan.",
       "v": "100"
     },
     "SatietyDecayPerSec": {
       "t": "float",
-      "d": "อิ่มจนกินต่อไม่ได้ (satiety_high) — ความอิ่มเต็ม 100 · ลดลงเองวินาทีละเท่านี้ ไม่ใช่หลอดโชว์ผู้เล่น ใช้กันกินรัวอย่างเดียวเหมือนต้นฉบับ",
+      "d": "EN: Rate at which satiety_high decreases per second, allowing players to eat again. It is not a visible player bar. | ID: Kecepatan satiety_high berkurang setiap detik agar pemain dapat makan lagi. Ini bukan bar yang ditampilkan kepada pemain.",
       "v": "100 / 6000",
       "g": 1
     }
@@ -1057,91 +1057,91 @@
   "Food": {
     "EnergyScale": {
       "t": "float",
-      "d": "สตามินาที่ได้ = ค่าในข้อมูลเกม × ตัวนี้",
+      "d": "EN: Stamina gained from food = game data value × this scale. | ID: Stamina yang diperoleh dari makanan = nilai data game × skala ini.",
       "v": "0.5"
     },
     "FatigueScale": {
       "t": "float",
-      "d": "ความล้าที่ลด = ค่าในข้อมูลเกม × ตัวนี้ (ข้อมูลเกมเก็บเป็นเลขติดลบ เช่น -150)",
+      "d": "EN: Fatigue reduction from food = game data value × this scale. Game data often stores fatigue values as negative numbers. | ID: Pengurangan kelelahan dari makanan = nilai data game × skala ini. Data game sering menyimpan nilai kelelahan sebagai angka negatif.",
       "v": "0.1"
     },
     "HealthScale": {
       "t": "float",
-      "d": "เลือดที่ฟื้น = ค่าในข้อมูลเกม × ตัวนี้",
+      "d": "EN: Health restored by food = game data value × this scale. | ID: Darah yang dipulihkan oleh makanan = nilai data game × skala ini.",
       "v": "1"
     },
     "RawFoodEnergyScale": {
       "t": "float",
-      "d": "**ของดิบให้พลังแค่เท่านี้เท่าของสุก** — นี่คือเหตุผลที่ต้องทำอาหาร (ของที่ติด tag `raw_food` ในข้อมูลเกม: เนื้อ · ปลา · ไข่ดิบ)",
+      "d": "EN: Energy from raw food relative to cooked food. Raw-food items are marked with the raw_food tag; cooking is intended to be worthwhile. | ID: Energi dari makanan mentah dibandingkan makanan matang. Item mentah ditandai dengan tag raw_food; memasak dirancang agar lebih menguntungkan.",
       "v": "0.6"
     },
     "RawFoodFatigue": {
       "t": "float",
-      "d": "กินของดิบแล้วความล้าเพิ่มเท่านี้ (ท้องไม่ดี) — 0 = ปิด",
+      "d": "EN: Fatigue added after eating raw food. 0 disables this penalty. | ID: Kelelahan tambahan setelah memakan makanan mentah. Nilai 0 menonaktifkan penalti ini.",
       "v": "3"
     },
     "DigestScale": {
       "t": "float",
-      "d": "กินแล้วต้องรอกี่เท่าของ digestivetime ในข้อมูลเกมถึงกินชิ้นถัดไปได้",
+      "d": "EN: Multiplier for the game's digestivetime before another item can be eaten. | ID: Pengali digestivetime dari game sebelum item berikutnya dapat dimakan.",
       "v": "1"
     }
   },
   "Abilities": {
     "Base": {
       "t": "float",
-      "d": "ค่าเริ่มต้นของทุก ability ตอนเลเวล 1 ยังไม่ทำอะไรเลย",
+      "d": "EN: Starting value for every ability at player level 1, before any progression. | ID: Nilai awal setiap ability pada level pemain 1, sebelum progres apa pun.",
       "v": "10"
     },
     "PerLevel": {
       "t": "float",
-      "d": "เพิ่มต่อ 1 เลเวลผู้เล่นหลังเลเวลเริ่มต้น (ได้ทุก ability เท่ากัน)",
+      "d": "EN: Amount added per player level after the starting level; applies equally to all abilities. | ID: Nilai tambahan setiap level pemain setelah level awal; berlaku sama untuk semua ability.",
       "v": "0.5"
     },
     "PerProficiency": {
       "t": "float",
-      "d": "เพิ่มต่อ 1 เลเวลความชำนาญหลังเลเวลเริ่มต้นของหมวดที่ป้อน ability ตัวนั้น",
+      "d": "EN: Amount added per proficiency level after the starting level of the category associated with the ability. | ID: Nilai tambahan setiap level proficiency setelah level awal kategori yang terkait dengan ability.",
       "v": "0.35"
     },
     "Max": {
       "t": "float",
-      "d": "เพดาน — กันเคสฟาร์มความชำนาญจนตัวเลขหลุดโลก",
+      "d": "EN: Maximum cap to prevent proficiency farming from producing extreme values. | ID: Batas maksimum untuk mencegah farming proficiency menghasilkan nilai yang tidak wajar.",
       "v": "100"
     }
   },
   "Combat": {
     "BareHandAttack": {
       "t": "float",
-      "d": "พลังโจมตีมือเปล่า",
+      "d": "EN: Base attack power when fighting without a weapon. | ID: Kekuatan serangan dasar saat bertarung tanpa senjata.",
       "v": "6"
     },
     "AttackPerLevel": {
       "t": "float",
-      "d": "พลังโจมตีเพิ่มต่อ 1 เลเวลผู้เล่น",
+      "d": "EN: Attack power added per player level. | ID: Kekuatan serangan tambahan setiap level pemain.",
       "v": "0.3"
     },
     "AttackPerStrength": {
       "t": "float",
-      "d": "พลังโจมตีเพิ่มต่อ 1 หน่วยพลัง (Strength)",
+      "d": "EN: Attack power added per Strength point. | ID: Kekuatan serangan tambahan setiap poin Strength.",
       "v": "0.15"
     },
     "WeaponAttackScale": {
       "t": "float",
-      "d": "ตัวคูณค่า `attack` ดิบของอาวุธในข้อมูลเกม (10-250) ให้เข้าสเกลดาเมจของเซิร์ฟนี้ 0.14 ⇒ ขวานหิน (73) ได้ ~10 เท่ากับโบนัสคงที่ของเดิมพอดี · ค้อนเหล็ก (177) ได้ ~25",
+      "d": "EN: Scale applied to raw weapon attack values from game data (10–250). 0.14 puts a stone axe near the old fixed bonus and scales an iron hammer to about 25. | ID: Skala untuk nilai attack mentah senjata dari data game (10–250). Nilai 0,14 membuat kapak batu mendekati bonus tetap lama dan memberi palu besi sekitar 25.",
       "v": "0.14"
     },
     "ArmorDefenseScale": {
       "t": "float",
-      "d": "ตัวคูณค่า `defense` ดิบของเกราะในข้อมูลเกม (0.3-105 ต่อชิ้น)",
+      "d": "EN: Scale applied to raw armor defense values from game data (about 0.3–105 per piece). | ID: Skala untuk nilai defense mentah armor dari data game (sekitar 0,3–105 per bagian).",
       "v": "1"
     },
     "ArmorDefenseK": {
       "t": "float",
-      "d": "ค่าคงที่ในสูตรลดดาเมจ: ลดลง = def / (def + K) K = 120 ⇒ ชุดหนัง+รองเท้า+ถุงมือของต้นเกม (รวม ~30) ลดดาเมจ ~20%",
+      "d": "EN: Constant in the damage-reduction formula: reduction = defense / (defense + K). K = 120 makes early leather gear reduce damage by about 20%. | ID: Konstanta dalam rumus pengurangan damage: pengurangan = defense / (defense + K). K = 120 membuat perlengkapan kulit awal mengurangi damage sekitar 20%.",
       "v": "120"
     },
     "ArmorMaxReduce": {
       "t": "float",
-      "d": "ลดดาเมจจากเกราะได้มากสุดกี่ % (กันชุดเทพจนตีไม่เข้า)",
+      "d": "EN: Maximum percentage of damage that armor can reduce, preventing overpowered gear from making attacks ineffective. | ID: Persentase maksimum damage yang dapat dikurangi armor, untuk mencegah perlengkapan terlalu kuat membuat serangan tidak berpengaruh.",
       "v": "0.75"
     },
     "CritChance": {
@@ -1158,37 +1158,37 @@
   "Farming": {
     "GrowthScale": {
       "t": "float",
-      "d": "ตัวคูณเวลาโต (0.05 = เร็วกว่าเกมจริง 20 เท่า)",
+      "d": "EN: Crop growth-time multiplier. 0.05 means crops grow 20 times faster than in the original game. | ID: Pengali waktu pertumbuhan tanaman. Nilai 0,05 berarti tanaman tumbuh 20 kali lebih cepat daripada game asli.",
       "v": "0.05"
     },
     "MinGrowSeconds": {
       "t": "float",
-      "d": "เวลาโตอย่างน้อยที่สุด กันพืชที่โตเร็วอยู่แล้วกลายเป็นโตทันที",
+      "d": "EN: Minimum crop growth duration, preventing already-fast crops from growing instantly. | ID: Durasi pertumbuhan minimum tanaman agar tanaman yang sudah cepat tidak tumbuh seketika.",
       "v": "20"
     },
     "WaterPerItem": {
       "t": "float",
-      "d": "น้ำที่ได้ต่อไอเทมน้ำ 1 ชิ้น",
+      "d": "EN: Amount of water provided by one water item. | ID: Jumlah air yang diberikan oleh satu item air.",
       "v": "1"
     },
     "FertilizerYieldScale": {
       "t": "float",
-      "d": "ตัวคูณผลผลิตที่ได้จากปุ๋ย (1 = ตามข้อมูลเกม)",
+      "d": "EN: Multiplier for extra yield from fertilizer. 1 follows the game data. | ID: Pengali hasil tambahan dari pupuk. Nilai 1 mengikuti data game.",
       "v": "1"
     },
     "SeedYield": {
       "t": "int",
-      "d": "เก็บเกี่ยวแล้วได้เมล็ดคืนกี่เม็ด (0 = ไม่คืนเมล็ด)",
+      "d": "EN: Number of seeds returned when harvesting. 0 means no seeds are returned. | ID: Jumlah benih yang dikembalikan saat panen. Nilai 0 berarti tidak ada benih yang dikembalikan.",
       "v": "1"
     },
     "WrongBiomeGrowthPenalty": {
       "t": "float",
-      "d": "ปลูกผิดไบโอม → เวลาโตคูณเท่านี้ (และได้ผลผลิตครึ่งเดียว)",
+      "d": "EN: Growth-time multiplier when a crop is planted in the wrong biome; yield is also halved. | ID: Pengali waktu tumbuh saat tanaman ditanam di bioma yang tidak sesuai; hasil panen juga menjadi setengah.",
       "v": "1.5"
     },
     "MaxWaterCarryPerDraw": {
       "t": "float",
-      "d": "ตักน้ำ 1 ครั้งได้มากสุดกี่หน่วย (กันภาชนะเลเวลสูงตักทีเดียวจบ)",
+      "d": "EN: Maximum water units collected per scoop, preventing high-level containers from filling instantly. | ID: Jumlah maksimum unit air yang diambil setiap kali menimba, agar wadah level tinggi tidak langsung penuh.",
       "v": "5"
     },
     "StaminaCostPlant": {
@@ -1233,91 +1233,91 @@
     },
     "WaterSearchTiles": {
       "t": "int",
-      "d": "ระยะที่ตักน้ำได้ นับจากตัวผู้เล่นถึง tile ที่เป็นน้ำ (tile)",
+      "d": "EN: Maximum tile distance from the player to a water tile when scooping water. | ID: Jarak maksimum dalam tile dari pemain ke tile air saat mengambil air.",
       "v": "6"
     }
   },
   "WarpAccelerator": {
     "WaitSeconds": {
       "t": "float",
-      "d": "เวลารอก่อนคลื่นแรกเริ่ม (นับจากกด \"เร่งวาร์ป\") และเวลาพักระหว่างคลื่น (Waiting/Intermission)",
+      "d": "EN: Wait time before the first wave starts after activating the Warp Accelerator, and the break between waves. | ID: Waktu tunggu sebelum gelombang pertama dimulai setelah Warp Accelerator diaktifkan, serta jeda antargelombang.",
       "v": "20"
     },
     "PhaseSeconds": {
       "t": "float",
-      "d": "เวลาที่มีให้ฆ่าสัตว์ในแต่ละคลื่นก่อนหมดเวลา — หมดเวลาแล้วยังมีสัตว์เหลือ = คลื่นนั้นล้มเหลว ไม่ได้รางวัล",
+      "d": "EN: Time allowed to defeat all animals in each wave. If any remain when time expires, the wave fails and grants no reward. | ID: Waktu untuk mengalahkan semua hewan pada setiap gelombang. Jika masih ada hewan saat waktu habis, gelombang gagal dan tidak memberi hadiah.",
       "v": "90"
     },
     "RewardWindowSeconds": {
       "t": "float",
-      "d": "ผ่านครบทุกคลื่นแล้ว มีเวลากดรับรางวัล (ReceiveAcceleratorRewards) นานแค่ไหนก่อนรีเซ็ตอัตโนมัติ",
+      "d": "EN: Time to claim rewards after completing all waves before the event resets automatically. | ID: Waktu untuk mengambil hadiah setelah semua gelombang selesai sebelum event direset otomatis.",
       "v": "180"
     },
     "CooldownSeconds": {
       "t": "float",
-      "d": "จบรอบแล้ว (สำเร็จหรือล้มเหลวก็ตาม) ต้องรอเท่าไรก่อนจะ \"เร่งวาร์ป\" รอบใหม่ที่จุดเดิมได้",
+      "d": "EN: Cooldown after a successful or failed run before the same accelerator can be activated again. | ID: Waktu cooldown setelah percobaan berhasil atau gagal sebelum accelerator yang sama dapat diaktifkan lagi.",
       "v": "30"
     },
     "MaxPhase": {
       "t": "int",
-      "d": "จำนวนคลื่นทั้งหมดต่อรอบ",
+      "d": "EN: Total number of waves per run. | ID: Jumlah total gelombang per percobaan.",
       "v": "3"
     },
     "AnimalsBase": {
       "t": "int",
-      "d": "จำนวนสัตว์คลื่นแรก",
+      "d": "EN: Number of animals in the first wave. | ID: Jumlah hewan pada gelombang pertama.",
       "v": "4"
     },
     "AnimalsStep": {
       "t": "int",
-      "d": "จำนวนสัตว์ที่เพิ่มขึ้นต่อคลื่น (คลื่นที่ 2 = Base+Step, คลื่นที่ 3 = Base+Step*2, ...)",
+      "d": "EN: Number of additional animals per wave; wave 2 = Base + Step, wave 3 = Base + 2 × Step, and so on. | ID: Jumlah hewan tambahan setiap gelombang; gelombang 2 = Base + Step, gelombang 3 = Base + 2 × Step, dan seterusnya.",
       "v": "2"
     },
     "SpawnRadiusTiles": {
       "t": "float",
-      "d": "กระจายสัตว์รอบจุด warp_accelerator ในรัศมีกี่ tile",
+      "d": "EN: Radius in tiles around the warp_accelerator where wave animals spawn. | ID: Radius dalam tile di sekitar warp_accelerator tempat hewan gelombang muncul.",
       "v": "4"
     },
     "JoinCostAmount": {
       "t": "long",
-      "d": "ค่าธรรมเนียมเข้าร่วม (Accelerate/ParticipateAcceleration) — ตั้ง 0 ไว้ก่อนโดยตั้งใจ: เซิร์ฟนี้ยังไม่มีระบบกระเป๋าเงิน/Currency ใช้งานจริงเลยสักจุด (grep \"Currency\\.\" ทั้ง ServerCore ไม่เจอที่ไหนใช้เลย) ผู้เล่นจึงไม่มีทางหา Gem/Coin มาจ่ายค่าธรรมเนียมได้ตั้งแต่ต้น ถ้าจะเก็บค่าธรรมเนียมจริงต้องสร้างระบบกระเป๋าเงินทั้งระบบก่อน (งานใหญ่แยกต่างหาก นอกขอบเขตนี้)",
+      "d": "EN: Participation fee amount. Keep at 0 for now because a working currency wallet/payment system is not implemented. | ID: Jumlah biaya partisipasi. Biarkan 0 untuk saat ini karena sistem dompet dan pembayaran mata uang belum berfungsi.",
       "v": "0"
     },
     "JoinCostCurrency": {
       "t": "Currency",
-      "d": "สกุลเงินของค่าธรรมเนียมเข้าร่วม (ไม่มีผลตอนนี้เพราะ JoinCostAmount = 0)",
+      "d": "EN: Currency used for the participation fee. Has no effect while JoinCostAmount is 0. | ID: Mata uang untuk biaya partisipasi. Tidak berpengaruh selama JoinCostAmount bernilai 0.",
       "v": "Currency.Coin"
     },
     "WarpMatterPerPhase": {
       "t": "int",
-      "d": "Warp Matter ที่ได้ต่อคลื่นที่ผ่าน (สะสมไว้ก่อน กดรับจริงตอน Status = End เท่านั้น)",
+      "d": "EN: Warp Matter earned for each completed wave. Rewards are accumulated and can only be claimed when status is End. | ID: Warp Matter yang diperoleh untuk setiap gelombang yang diselesaikan. Hadiah dikumpulkan dan hanya dapat diambil saat status End.",
       "v": "5"
     },
     "WeeklyWarpMatterCap": {
       "t": "int",
-      "d": "เพดาน Warp Matter ที่ผู้เล่นคนหนึ่งรับได้ต่อสัปดาห์ (ดู ServerPlayer.WarpAccelerator)",
+      "d": "EN: Maximum Warp Matter one player can claim per week. See ServerPlayer.WarpAccelerator. | ID: Maksimum Warp Matter yang dapat diklaim satu pemain setiap minggu. Lihat ServerPlayer.WarpAccelerator.",
       "v": "100"
     }
   },
   "Android": {
     "ClusterMode": {
       "t": "string",
-      "d": "cluster_mode ที่ตอบให้มือถือใน /knock และ /entry · ว่าง = ใช้ค่าเดียวกับเซิร์ฟ (--cluster-mode) ทำไมต้องแยก: เมนูในเกมถูกกรองด้วย ClusterMode ฝั่ง client (MenuSystem.IsHiddenMenu ของเกมต้นฉบับ) · Online ⇒ ซ่อน MoveToTitle (กลับหน้าไตเติ้ล) / Connect / WarpShop / CharacterOnMenu … (HiddenInOnline) · SingleMode ⇒ โชว์ตามรายการ ShowInSingleMode ซึ่งมี Craft/Skill/Quest/Estate/Encyclopedia/**MoveToTitle** ครบ client PC ชุดเราแก้รายการนี้ในโค้ดแล้ว แต่มือถือแก้ไม่ได้ ⇒ สลับโหมดให้มันแทน แชทช่องรวมยังใช้ได้ทั้งสองโหมด (SingleMode ส่งผ่าน connection เกม · Online ส่งผ่านพอร์ต radiotower)",
+      "d": "EN: Cluster mode returned to mobile clients by /knock and /entry. Leave empty to use --cluster-mode. The mode controls which menus the original client shows; chat works in both modes. | ID: Mode cluster yang dikirim ke client mobile melalui /knock dan /entry. Kosongkan untuk menggunakan --cluster-mode. Mode menentukan menu yang ditampilkan client asli; chat berfungsi pada kedua mode.",
       "v": "\"Online\""
     },
     "WelcomeInfo": {
       "t": "bool",
-      "d": "เข้าโลกแล้วเด้ง popup \"ยินดีต้อนรับ … ออนไลน์ N คน\" ให้มือถือ (PC ชุดเรามีจำนวนคนที่แท็บแชทอยู่แล้ว)",
+      "d": "EN: Shows mobile players a welcome popup after entering the world, including the number of players online. | ID: Menampilkan popup sambutan pada pemain mobile setelah memasuki dunia, termasuk jumlah pemain online.",
       "v": "true"
     },
     "OnlineCountInChat": {
       "t": "bool",
-      "d": "มีคนเข้า/ออก ⇒ ส่งบรรทัดแชทช่อง System \"X เข้าเกม · ออนไลน์ N คน\" ให้มือถือ (แทนตัวเลขบนแท็บแชทของ PC)",
+      "d": "EN: Sends a System chat line to mobile players when someone joins or leaves, including the current online count. | ID: Mengirim baris chat System kepada pemain mobile saat seseorang masuk atau keluar, termasuk jumlah pemain online saat ini.",
       "v": "true"
     },
     "AlwaysResendChunks": {
       "t": "bool?",
-      "d": "[4 ก.ย. 2026] ส่ง terrain chunk เต็มกรอบทุกครั้งที่มือถือข้ามขอบ chunk (ไม่ข้ามการส่งซ้ำ) 🐛 แก้อาการ \"เดินต่อแล้วพื้นที่ใหม่ไม่เรนเดอร์ ค้างอยู่แค่โซนเดิม\" — เกมต้นฉบับบนมือถือถือ chunk ไว้ไม่เท่าที่เซิร์ฟคิด ก้อนที่มันทิ้งไปจะไม่ถูกส่งซ้ำ กลายเป็นรูโหว่ถาวร (ดู ServerPlayer.HandleSetChunk) ปิด = กลับไปใช้พฤติกรรมเดิมแบบ PC (ประหยัดแบนด์วิดท์กว่า แต่มือถือจะมีรูโหว่) ⚠️ เป็น bool? ตั้งใจ: config.json ที่มีอยู่แล้ว (ไม่มีคีย์นี้) จะได้ null = เปิดไว้ตามค่าเริ่มต้น ถ้าใช้ bool ธรรมดา ไฟล์เก่าจะ deserialize เป็น false แล้วแก้บั๊กไม่ทำงานแบบเงียบ ๆ",
+      "d": "EN: Always resend the full terrain chunk range when a mobile client crosses a chunk boundary. Fixes areas that stop rendering because the original mobile client discards chunks without requesting them again. Disable to use the PC-style behavior, which saves bandwidth but may leave gaps on mobile. | ID: Selalu kirim ulang rentang chunk terrain penuh saat client mobile melewati batas chunk. Memperbaiki area yang berhenti dirender karena client mobile asli membuang chunk tanpa meminta ulang. Nonaktifkan untuk perilaku seperti PC yang lebih hemat bandwidth tetapi dapat meninggalkan area kosong di mobile.",
       "v": "true"
     }
   }
