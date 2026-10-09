@@ -126,7 +126,7 @@
     'Region':'Wilayah',
     'Actions':'Aksi',
     'Game Data Browser':'Penjelajah Data Game',
-    'Select data':'Pilih data'
+    'Select data':'Pilih data',
     'Balance range':'Rentang saldo',
     'Characters':'Karakter',
     'Kick':'Keluarkan',
