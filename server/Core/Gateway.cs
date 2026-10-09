@@ -13,14 +13,14 @@ using Yaml.Util;
 
 namespace Durango.Online;
 
-// พอร์ตจาก nexonSRC/Durango.Online/Gateway.cs (HTTP 8190) + กาวมือถือที่จำเป็น
-// ส่วนที่คงต้นฉบับ: /knock /notice /sessions /admission /entry /players /terrains/* + UnhandledUrl chunks
-// ส่วนกาว (deviations — เอกสารเต็มใน docs/server/ServerNx.md):
-//  1) /knock: ต้นฉบับชี้ CDN ของ Nexon (assetbundles.k.nexon.com / akamaized.net) — ที่นี่ชี้โฮสต์ตัวเอง
-//     และเสิร์ฟไฟล์ bundle จากดิสก์ (client มือถือยังต้องโหลด asset bundles จริง)
-//  2) /sessions: ต้นฉบับรับเฉพาะฟิลด์ "player" (LAN joiner) — เพิ่ม session token + สล็อตผู้เล่น
-//     ให้รองรับคนหลายคนโดยคงรูปร่าง response ต้นฉบับ (user_id + session_token)
-//  3) /entry: frontend_addresses ใช้ host จาก --public-host หรือ Host header (ต้นฉบับ: 127.0.0.1 คงที่)
+// Ported from nexonSRC/Durango.Online/Gateway.cs (HTTP 8190), with required mobile-client compatibility glue.
+// Original routes retained: /knock, /notice, /sessions, /admission, /entry, /players, /terrains/*, and unhandled URL chunks.
+// Compatibility deviations (full documentation is in docs/server/ServerNx.md):
+// 1) /knock: the original points to Nexon CDNs; this server points to its own host.
+//    Bundle files are served from disk; the mobile client still needs real asset bundles.
+// 2) /sessions: the original accepts only the "player" field for LAN joiners; this adds session tokens and player slots.
+//    Multiple players are supported while preserving the original response shape (user_id + session_token).
+// 3) /entry: frontend_addresses uses --public-host or the Host header instead of a fixed 127.0.0.1.
 public class Gateway
 {
     public const int DefaultPort = 8190;
@@ -42,34 +42,34 @@ public class Gateway
     public string AssetBundleAndroidDir { get; set; }
 
     /// <summary>
-    /// [5 ก.ย. 2026] โฟลเดอร์ JSON ที่เสิร์ฟให้ /assets/* (ปกติ &lt;data&gt;/assets)
+/// <summary>JSON directory served through /assets/* (usually &lt;data&gt;/assets).</summary>
     ///
-    /// ทำไมต้องมี: ตัวเกมโหลดตารางข้อมูลคนละทางตาม ClusterMode — ดู client/Yaml.Util/Loader.cs:164
-    ///   Mode.Online  → HTTP GameManager.GatewayUrl + "/assets/&lt;ชื่อ&gt;"  (มาที่นี่)
-    ///   โหมดอื่น     → Resources ในตัวเกม "offline/assets/&lt;ชื่อ&gt;"
-    /// เซิร์ฟในตัวของเกมไม่มีเส้นนี้เพราะมันไม่เคยรันเป็น Online ⇒ พอเปิด Online แล้วต้องมี
-    /// ไม่งั้นเกมค้างที่ CheckDataLoaded (Loader รีทราย 5 รอบต่อไฟล์ แล้วไม่ไปต่อ)
+/// The client loads data tables differently depending on ClusterMode; see client/Yaml.Util/Loader.cs:164.
+/// Mode.Online → HTTP GameManager.GatewayUrl + "/assets/&lt;name&gt;" (served here).
+/// Other modes → Resources bundled in the game at "offline/assets/&lt;name&gt;".
+/// The built-in server never runs online, so this route is required when Online mode is enabled.
+/// Otherwise CheckDataLoaded stalls after the loader retries each file five times.
     /// </summary>
     public string AssetsDir { get; set; }
 
     /// <summary>
-    /// [5 ก.ย. 2026] รหัสผ่านของเส้นทางสำหรับคนดูแล (ตอนนี้มีแต่ /health) — Host ส่งค่าให้ตอนสร้าง
-    /// ว่าง = ให้เรียกได้เฉพาะจากเครื่องตัวเอง (loopback) ดู <see cref="IsAdminAllowed"/>
+/// Admin route token (currently used only by /health); Host supplies it during initialization.
+/// Empty means localhost-only access. See <see cref="IsAdminAllowed"/>.
     /// </summary>
     public string AdminToken { get; set; }
 
     /// <summary>
-    /// โฟลเดอร์ data ของเซิร์ฟ — ใช้สำหรับอ่าน/เขียน config files ใน admin API
+/// Server data directory used to read and write configuration files through the admin API.
     /// </summary>
     public string DataDir { get; set; }
 
     /// <summary>
-    /// เวอร์ชันตัวเกมต่ำสุดที่ยอมให้เข้า — <c>null</c> = รับทุกเวอร์ชัน (ค่าตั้งต้น)
-    /// ตั้งด้วย <c>--min-client-version</c> · ดูเหตุผลที่ยังไม่บังคับโดยปริยายที่เส้น /knock
+/// Minimum allowed client version; <c>null</c> means all versions are accepted by default.
+/// Set with <c>--min-client-version</c>; see /knock for why version enforcement is disabled by default.
     /// </summary>
     public string MinClientVersion { get; set; }
 
-    /// <summary>ลิงก์ให้ผู้เล่นไปโหลดตัวเกมใหม่ — ต้องมีถ้าจะเปิดด่านเวอร์ชัน</summary>
+/// <summary>Download link shown to players when a client update is required.</summary>
     public string DownloadUrl { get; set; }
 
     private string _bundleIndexAndroidCache;
@@ -100,30 +100,30 @@ public class Gateway
         {
             string platform = PlatformKey(request.QueryString.Get("platform"));
 
-            // [6 ก.ย. 2026] ด่านเวอร์ชัน — ตอบ compatible ตามที่ตัวเกมส่งมาจริง ไม่ใช่ true ตายตัว
+// [Sep 6, 2026] Version gate: check compatibility against the version reported by the client instead of always returning true.
             //
-            // ⚠️ เดิมตอบ true เสมอและไม่เคยอ่าน ?version= ที่เกมส่งมาเลย ⇒ ตัวเกมเวอร์ชันเก่า
-            // ต่อเข้ามาได้ แล้วค่าที่ unpack เพี้ยนถูกเขียนลงไฟล์เซฟเงียบ ๆ
+// Previously the endpoint always returned true and ignored the client's ?version= value.
+// Older clients could connect and silently write incompatible unpacked values into save files.
             //
-            // ⚠️ **ค่าตั้งต้นยังเป็น "รับทุกเวอร์ชัน"** เพราะทุก build ของเราปัจจุบันรายงานตัวเองว่า
-            // 5.2.1 เหมือนกันหมด (ยังไม่มีเลข build แยก) ⇒ เปิดด่านตอนนี้จะกันคนที่ควรเข้าได้ด้วย
-            // ตั้ง --min-client-version เมื่อไรค่อยเริ่มบังคับ (ดู Program.cs)
+// The default remains accept-all because all current builds report version 5.2.1.
+// Without distinct build numbers, enforcing the gate now could block compatible players.
+// Enable --min-client-version to enforce it. See Program.cs.
             string clientVersion = request.QueryString.Get("version");
             bool compatible = MinClientVersion == null
                               || string.IsNullOrEmpty(clientVersion)
                               || string.CompareOrdinal(clientVersion, MinClientVersion) >= 0;
             if (!compatible)
             {
-                Console.WriteLine($"[เวอร์ชัน] ปฏิเสธตัวเกม {clientVersion} (ต้องอย่างน้อย {MinClientVersion})");
+                Console.WriteLine($"[version] Rejected client version {clientVersion} (ต้องอย่างน้อย {MinClientVersion})");
             }
 
             JObject jObject = new()
             {
-                // ต้นฉบับ: CurrentBundleVersion.GetClientVersion() = "5.2.1"
+// Original: CurrentBundleVersion.GetClientVersion() = "5.2.1".
                 ["server_version"] = "5.2.1",
                 ["compatible"] = compatible,
-                // ⚠️ ต้องมีลิงก์โหลดคู่กับ compatible=false เสมอ ไม่งั้นผู้เล่นตันที่หน้า error
-                // โดยไม่รู้ว่าต้องไปโหลดที่ไหน (audit ระบุไว้เป็นข้อ high แยกต่างหาก)
+// ⚠️ Always provide a download link when compatible=false, otherwise players are stuck on the error screen.
+// This was identified as a separate high-priority audit item.
                 ["download_url"] = DownloadUrl ?? "",
                 ["assetbundle_index_url"] = $"{RootUrl(request)}/live/{platform}/Info.5.2.1.json",
                 ["assetbundle_url_root"] = $"{RootUrl(request)}/live/{platform}/"
@@ -138,21 +138,21 @@ public class Gateway
         {
             string remoteIp = request?.RemoteEndPoint?.Address?.ToString() ?? "?";
 
-            // [5 ก.ย. 2026] กุญแจบัญชี — ตัวเกมส่งมาในช่อง account_id อยู่แล้วทุกคำขอ
-            // (client/Durango.System/Platform.cs:118 BuildSessionForm) แต่ต้นฉบับคืนค่าว่างเสมอ
-            // จึงแพตช์ฝั่งเกมให้คืนกุญแจประจำเครื่อง (ดูเหตุผลเต็มที่ Support/AccountKeys)
-            // ⚠️ ไม่มีกุญแจ = ปฏิเสธ ไม่ใช่ปล่อยผ่านแบบเดิม — ตัวเกมรุ่นเก่าที่ยังไม่แพตช์ต้องเข้าไม่ได้
+// [Sep 5, 2026] The client already sends an account key in account_id on every request.
+// (client/Durango.System/Platform.cs:118 BuildSessionForm), but the original server always returned an empty value.
+// The client is patched to return a device-specific key; see Support/AccountKeys for details.
+// ⚠️ Missing key means reject the request, not allow it through; unpatched old clients must not connect.
             string ownerKey = AccountKeys.Normalize(postData.Get("account_id"));
             if (ownerKey == null)
             {
-                Console.WriteLine($"[gateway] /sessions ปฏิเสธ {remoteIp} — ไม่มีกุญแจบัญชี (ตัวเกมเก่า?)");
+                Console.WriteLine($"[gateway] /sessions rejected {remoteIp} — missing account key (old client?)");
                 return new WebServer.JsonResponse(
                     new JObject { ["error"] = "no_account_key" }.ToString(), HttpStatusCode.Unauthorized);
             }
 
             if (BanList.IsBanned(ownerKey))
             {
-                Console.WriteLine($"[แบน] ปฏิเสธ {remoteIp} — บัญชี {AccountKeys.ForLog(ownerKey)} ถูกแบน");
+                Console.WriteLine($"[ban] Rejected {remoteIp} — account {AccountKeys.ForLog(ownerKey)} is banned");
                 return new WebServer.JsonResponse(new JObject
                 {
                     ["error"] = "banned",
@@ -162,12 +162,12 @@ public class Gateway
 
             if (Host.Maintenance)
             {
-                Console.WriteLine($"[ดูแล] ปฏิเสธ {remoteIp} — กำลังปิดปรับปรุง");
+                Console.WriteLine($"[admin] Rejected {remoteIp} — maintenance mode is active");
                 return new WebServer.JsonResponse(
                     new JObject { ["error"] = "maintenance" }.ToString(), HttpStatusCode.ServiceUnavailable);
             }
 
-            // เส้นทางต้นฉบับ: LAN joiner ส่ง PlayerContext JSON ของตัวเองมาในฟิลด์ "player"
+// Original route: LAN joiners send their own PlayerContext JSON in the "player" field.
             string player = postData.Get("player");
             PlayerContext context = null;
             if (!string.IsNullOrEmpty(player))
@@ -175,7 +175,7 @@ public class Gateway
                 try
                 {
                     context = Json.Read<PlayerContext>(player);
-                    context?.Initialize(null); // Path = null ⇒ ยังไม่เซฟ จนกว่า /players จะเลื่อนเป็นสล็อตจริง
+context?.Initialize(null); // Path = null means no save until /players promotes this context to a real slot.
                 }
                 catch (Exception e)
                 {
@@ -185,34 +185,34 @@ public class Gateway
 
             if (context == null)
             {
-                // ต้นฉบับ: ไม่มี player → ใช้ _playerCtx (โฮสต์) — เซิร์ฟเราไม่มี "โฮสต์" จึงสร้าง context ชั่วคราว
+// Original behavior used _playerCtx (the host) when player was absent; this server has no host, so it creates a temporary context.
                 context = _host.CreateTemporaryContext(null, null, null);
             }
             else if (_host.FindContextByEntityId(context.EntityId) is { } known)
             {
-                // ⚠️ ช่องโหว่เดิม: เชื่อ entity id ที่ผู้ขอพิมพ์มาเอง แล้วออก token ให้สล็อตจริงบนดิสก์ทันที
-                // ⇒ POST เดียว body player={"player_info":{"player_entity_id":"ของเหยื่อ"}} = ยึดตัวละครได้
-                // ตอนนี้ต้องเป็นเจ้าของก่อนถึงจะหยิบสล็อตจริงมาใช้ได้
+// ⚠️ Previous vulnerability: trusted a caller-supplied entity ID and issued a token for a real on-disk slot.
+// A single POST with player_info.player_entity_id set to a victim's ID could take over that character.
+// The caller must now own the character before its real slot can be used.
                 if (AccountKeys.Same(ownerKey, known.OwnerKey))
                 {
-                    context = known;   // ตัวละครของเราเอง — ใช้เซฟบนดิสก์เป็นหลัก
+context = known;   // The caller's own character; use its on-disk save.
                 }
                 else
                 {
-                    Console.WriteLine($"[gateway] /sessions {remoteIp} ขอสวมตัวละคร {known.EntityId} " +
-                                      $"ที่ไม่ใช่ของบัญชี {AccountKeys.ForLog(ownerKey)} — ให้ context ใหม่แทน");
+                    Console.WriteLine($"[gateway] /sessions {remoteIp}  attempted to use character {known.EntityId} " +
+                                      $" which is not owned by account {AccountKeys.ForLog(ownerKey)} — temporary context will be used");
                     context = _host.CreateTemporaryContext(null, null, null);
                 }
             }
 
-            // context ชั่วคราวเป็นของบัญชีที่ขอมาตั้งแต่ต้น — /players จะเซฟค่านี้ลงไฟล์ตอนสร้างจริง
+// The temporary context belongs to the requesting account; /players saves it when the character is created.
             context.OwnerKey ??= ownerKey;
 
             _gameServer.Register(context);
             string token = Guid.NewGuid().ToString("N");
             _gameServer.IssueSession(context.EntityId, token, ownerKey);
             Console.WriteLine($"[gateway] /sessions {remoteIp} → {context.PlayerInfo.PlayerName} ({context.EntityId})" +
-                              (string.IsNullOrEmpty(context.Path) ? " [ชั่วคราว]" : ""));
+                              (string.IsNullOrEmpty(context.Path) ? " [temporary]" : ""));
             return new WebServer.JsonResponse(new JObject
             {
                 ["user_id"] = context.EntityId,
@@ -225,21 +225,21 @@ public class Gateway
 
         _webServer.GetRoute["/entry"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
-            // [5 ก.ย. 2026] เพดานผู้เล่น (--max-players) — เดิมรับค่ามาแล้วพิมพ์ทิ้ง ไม่มีที่ไหนใช้เลย
+// [Sep 5, 2026] Player cap (--max-players) was previously parsed and printed but never enforced.
             //
-            // ทำไมมาห้ามที่ /entry: นี่คือด่านสุดท้ายก่อน client จะรู้ที่อยู่ TCP ของโลก
-            // (frontend_addresses) ⇒ ห้ามที่นี่ = ตัวละครยังไม่ทันโผล่ในโลก ไม่ต้องเตะใครออก
+// /entry is the last gate before the client receives the world's TCP address.
+// Rejecting here prevents a character from entering the world without forcibly disconnecting anyone.
             //
-            // ⚠️ เป็นด่าน "อ่อน" ไม่ใช่ด่านแข็ง: ใครที่ถือ frontend_addresses อยู่แล้วยังต่อ TCP ได้
-            // ด่านแข็งต้องอยู่ที่ Auth ใน Core/GameServer.cs:153 ซึ่งอยู่นอกขอบเขตที่งานรอบนี้แก้ได้
-            // ⚠️ นับไม่ได้ (PlayersOnline คืน -1) ⇒ ปล่อยผ่าน ดีกว่ากันคนเข้าเพราะตัวนับพัง
+// ⚠️ This is a soft gate: clients that already have frontend_addresses can still connect over TCP.
+// A hard gate belongs in Auth in Core/GameServer.cs:153, outside this change's scope.
+// ⚠️ If online count cannot be determined (PlayersOnline returns -1), allow entry rather than locking everyone out.
             int cap = _host.MaxPlayers;
             if (cap > 0)
             {
                 int online = _host.PlayersOnline();
                 if (online >= cap)
                 {
-                    Console.WriteLine($"[gateway] /entry ปฏิเสธ — เซิร์ฟเต็ม ({online}/{cap})");
+                    Console.WriteLine($"[gateway] /entry rejected — server is full ({online}/{cap})");
                     return new WebServer.JsonResponse(new JObject
                     {
                         ["error"] = "server_full",
@@ -249,30 +249,30 @@ public class Gateway
                 }
             }
 
-            // [5 ก.ย. 2026] ตัวเกมบอกที่นี่ว่าจะเล่นตัวละครไหน — /entry?entity_id=…&platform=…
-            // (client/Durango.UI/TitleMenuGroup.cs:1039-1046) และยิงมาแบบ auth:true คือมี header
-            // Authorization = session token ⇒ ย้าย token ให้ชี้ตัวละครนั้น ไม่งั้น Auth ฝั่ง TCP
-            // จะปฏิเสธ เพราะ /sessions ออก token ให้ context ชั่วคราวไปก่อน (โหมด Online ไม่ส่ง "player")
+// [Sep 5, 2026] The client selects its character here via /entry?entity_id=…&platform=…
+// (client/Durango.UI/TitleMenuGroup.cs:1039-1046); auth:true means it sends an Authorization header.
+// Authorization contains the session token, so remap it to that character or TCP Auth will reject the connection.
+// /sessions initially issues a token for a temporary context; Online mode does not send "player".
             string entryEntity = request?.QueryString?["entity_id"];
             string entryToken = request?.Headers?["Authorization"];
             if (!string.IsNullOrEmpty(entryEntity) && _gameServer.BindSessionToEntity(entryToken, entryEntity))
             {
-                Console.WriteLine($"[gateway] /entry ผูก session เข้ากับตัวละคร {entryEntity}");
+                Console.WriteLine($"[gateway] /entry linked session to character {entryEntity}");
             }
 
             string tcpHost = !string.IsNullOrEmpty(PublicHost)
                 ? PublicHost
                 : (request.UserHostName?.Split(':').FirstOrDefault() ?? "127.0.0.1");
-            // [7 ก.ย. 2026] เติม radiotower_addresses — ช่องแชท/แจ้งเตือนของเผ่ากับสังคม
+// [Sep 7, 2026] Add radiotower_addresses for clan and social chat/notifications.
             //
-            // client/Durango.UI/TitleMenuGroup.cs:949-952 อ่านคีย์นี้แล้วส่งให้
-            // SocialSystem.SetEndpoints ⇒ ไม่มีคีย์ = รายการ endpoint ว่าง = สาย Radiotower
-            // ไม่เคยต่อติดเลยสักครั้ง ⇒ ToggleClanNotification(4025) ·
-            // GetClanNotificationEnabled(4027) · ResubscribeClanChannel(24) ที่ลงทะเบียนไว้
-            // ใน Player.Clan.cs ไม่มีทางถูกเรียกถึง
+// client/Durango.UI/TitleMenuGroup.cs:949-952 reads this key and passes it to
+// SocialSystem.SetEndpoints. Without it, the endpoint list is empty and Radiotower never connects.
+// As a result, ToggleClanNotification(4025),
+// GetClanNotificationEnabled(4027), and ResubscribeClanChannel(24)
+// registered in Player.Clan.cs can never be reached.
             //
-            // เซิร์ฟนี้มี Connection เดียวต่อผู้เล่น (ไม่ได้แยกโปรเซส radiotower แบบ NEXON)
-            // ⇒ ชี้มาพอร์ตเกมเดียวกัน handler ชุดเดิมรับได้เลย ไม่ต้องเปิดพอร์ตใหม่
+// This server uses one connection per player instead of Nexon's separate Radiotower process.
+// Point it at the game port; existing handlers can process it without another port.
             return new WebServer.JsonResponse(new JObject
             {
                 ["frontend_addresses"] = new JArray($"{tcpHost}:{_gameServer.Port}"),
@@ -283,21 +283,21 @@ public class Gateway
 
         _webServer.PostRoute["/players"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
-            // ต้นฉบับ (prologue สร้างตัวละคร): name/region/job/gender/model_info → อัปเดต context + ใส่ชุดตามอาชีพ
-            // ⚠️ เดิมถอยไปที่ _playerCtx เมื่อไม่มีหัว Authorization ⇒ คนนอกยิง POST /players ว่าง ๆ
-            // ก็เขียนทับชื่อ/เพศ/หน้าตาของตัวละครสล็อตแรกได้ถาวร และเปลี่ยน TerrainId ของโลกหลักด้วย
-            // ⇒ ต้องมี session จริงเท่านั้น
+// Original character-creation flow: name/region/job/gender/model_info updates context and equips the job outfit.
+// ⚠️ Previously, missing Authorization fell back to _playerCtx, so an unauthenticated empty POST /players
+// could permanently overwrite the first slot's name, gender, appearance, and main-world TerrainId.
+// A valid session is now required.
             string ownerKey = _gameServer.OwnerOfSession(request?.Headers?["Authorization"]);
             PlayerContext context = ResolveBySession(request);
             if (context == null || ownerKey == null)
             {
-                Console.WriteLine("[gateway] /players ปฏิเสธ — ไม่มี session ที่ถูกต้อง");
+Console.WriteLine("[gateway] /players rejected: no valid session");
                 return new WebServer.JsonResponse(
                     new JObject { ["error"] = "unauthorized" }.ToString(), HttpStatusCode.Unauthorized);
             }
 
-            // ⚠️ เส้นนี้มีไว้ "สร้างตัวใหม่" เท่านั้น — ตัวที่มี Path แล้วคือตัวที่สร้างเสร็จไปแล้ว
-            // ห้ามให้เขียนทับ (ของเราเองก็ตาม) ไม่งั้นยิงซ้ำ = ตัวละครเดิมโดนรีเซ็ต
+// ⚠️ This route creates a new character only. A context with Path already has a saved character.
+// Never overwrite it, even for the same user; a repeated request would reset the character.
             if (!string.IsNullOrEmpty(context.Path) || string.IsNullOrEmpty(context.PlayerInfo.PlayerEntityId))
             {
                 context = _host.CreateTemporaryContext(null, null, null);
@@ -321,9 +321,9 @@ public class Gateway
             if (item.HasValue)
             {
                 Item value2 = item.Value;
-                // ⚠️ BodyColor เป็น null ได้เมื่อคำขอไม่ได้ส่ง model_info มา — ตัวเกมจริงส่งเสมอ
-                // แต่คำขอที่ประกอบเองไม่ส่งก็ได้ แล้วเดิมจะ NullReference ทั้ง route (ตอบ 500)
-                // เมื่อก่อนไม่เคยเห็นเพราะ route ถอยไปใช้ _playerCtx ซึ่งมีสีค้างจากตัวละครก่อนหน้า
+// ⚠️ BodyColor can be null when model_info is omitted. The official client always sends it,
+// but manually constructed requests may not; previously this caused a NullReferenceException and HTTP 500.
+// It was hidden before because the route fell back to _playerCtx, which retained the previous character's color.
                 if (bodyColor != null && bodyColor.Length >= 3)
                 {
                     value2.ColorR = bodyColor[0];
@@ -340,39 +340,39 @@ public class Gateway
             return new WebServer.JsonResponse(new JObject { ["entity_id"] = context.EntityId }.ToString());
         };
 
-        // [5 ก.ย. 2026] รายชื่อตัวละคร — **ของบัญชีที่ถามเท่านั้น**
+// [Sep 5, 2026] Return character slots belonging only to the requesting account.
         //
-        // ⚠️ เดิมคืนตัวละครทุกตัวบนเซิร์ฟให้ใครก็ได้ แล้วหน้าเลือกตัวละครในเกมเอามาทำเป็นปุ่ม
-        // (client/Durango.UI/TitlePlayerSelectionGroupBase.cs:94,120) ⇒ ผู้เล่นคนที่ 2 เปิดเกม
-        // เห็นตัวละครของคนที่ 1 ในสล็อตตัวเอง กดเข้าเล่นได้เลยโดยไม่ต้องแฮกอะไร
-        // แถม client ยังตั้งตัวที่ "เพิ่งออกจากเกมล่าสุดของทั้งเซิร์ฟ" เป็นตัวแนะนำให้อัตโนมัติ
-        // (client/Durango.Logic.Clusters/Account.cs:34 MaxBy(DisconnectedAt)) ⇒ กด Confirm รวดเดียวก็ติด
+// Previously, every server character was returned to anyone; the game turned these into selection buttons.
+// (client/Durango.UI/TitlePlayerSelectionGroupBase.cs:94,120), so a second player could
+// see the first player's character in their own list and enter it without exploiting anything.
+// The client also automatically recommends the character most recently disconnected server-wide.
+// (client/Durango.Logic.Clusters/Account.cs:34 MaxBy(DisconnectedAt)), making takeover a one-click action.
         //
-        // ตัวเกมส่ง account_id มากับคำขอนี้อยู่แล้ว (Clusters.RequestAccounts ใช้ BuildSessionForm)
+// The client already sends account_id with this request (Clusters.RequestAccounts uses BuildSessionForm).
         _webServer.PostRoute["/accounts"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             string key = AccountKeys.Normalize(postData.Get("account_id"));
             if (key == null)
             {
-                // ไม่มีกุญแจ = ไม่มีบัญชี ⇒ ไม่มีตัวละคร (ไม่ใช่ "เห็นทุกตัว" แบบเดิม)
+// No account key means no account and therefore no characters; never expose every slot.
                 return new WebServer.JsonResponse(Json.Write(Host.EmptyAccount()));
             }
             return new WebServer.JsonResponse(Json.Write(_host.BuildAccount(key)));
         };
 
-        // [5 ก.ย. 2026] /health — ตัวเลขสุขภาพเซิร์ฟสำหรับคนดูแล (ตัวเกมไม่ได้เรียกเส้นนี้)
+// [Sep 5, 2026] /health exposes server health metrics for administrators; the game client does not call it.
         //
-        // ทำไมต้องมี: เวลาผู้เล่นบอกว่า "เซิร์ฟหน่วง" เดิมไม่มีอะไรให้ดูเลย ต้องเดาล้วน ๆ
-        // ตอนนี้ดูได้ทันทีว่ารอบเกมช้าจริงไหม (tick_ms) · เซฟล่าสุดเมื่อไร · พังไปกี่ครั้ง
-        // · มีแพ็กเก็ตชนิดไหนที่เกมส่งมาแล้วเรายังไม่รองรับ (unhandled_packet_types)
+// Previously, reports of server lag could not be diagnosed because no metrics were available.
+// Now it reports tick duration, last successful save, and error counts.
+// It also lists packet types sent by the game that the server has not implemented.
         //
-        // ⚠️ route นี้รันบนลูปเกม (Gateway.Process ถูกเรียกใน Host.Process) ⇒ ต้องเบา
-        // งานหนักสุดคือ sort ตัวอย่างเวลา 512 ตัว ซึ่งทำเฉพาะตอนมีคนเรียกเท่านั้น
-        // ══ เครื่องมือดูแลเซิร์ฟ ══════════════════════════════════════════════════
-        // audit: "ไม่มีเครื่องมือเตะ/แบน/ปิดปากเลยแม้แต่ตัวเดียว — เจอคนป่วนแล้วทำได้อย่างเดียว
-        // คือปิดทั้งเซิร์ฟ" · ทุกเส้นใช้ด่านเดียวกับ /health (--admin-token หรือเรียกจากเครื่องเซิร์ฟเอง)
+// ⚠️ This route runs on the game loop, so keep it lightweight.
+// The heaviest work sorts 512 timing samples and runs only when requested.
+// ══ Server administration tools ═════════════════════════════════════════════
+// Audit note: there were no kick/ban/mute tools; disruptive players could only be handled by shutting down the server.
+// All admin routes use the same gate as /health (--admin-token or localhost access).
 
-        // ใครออนไลน์อยู่บ้าง — ต้องรู้ก่อนถึงจะเตะถูกคน
+// List online players before allowing an administrator to kick the correct player.
         _webServer.GetRoute["/admin/who"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
