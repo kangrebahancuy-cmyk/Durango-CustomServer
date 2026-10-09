@@ -352,20 +352,20 @@ public partial class Player
     {
         if (!MayTouchArtifact(msg.EntityId, "สร้างแท็บคลัง"))
         {
-            Send(new Abort { Text = "ทำกับสิ่งปลูกสร้างนี้ไม่ได้" }, seq);
+            Send(new Abort { Text = "This action cannot be performed on this structure" }, seq);
             return;
         }
         if (string.IsNullOrWhiteSpace(msg.SectionName))
         {
-            Send(new Abort { Text = "ต้องตั้งชื่อแท็บ" }, seq);
+            Send(new Abort { Text = "A tab name is required" }, seq);
             return;
         }
         if (!WarehouseStore.MakeSection(msg.EntityId, msg.SectionName))
         {
-            Send(new Abort { Text = "มีแท็บชื่อนี้อยู่แล้ว" }, seq);
+            Send(new Abort { Text = "A tab with this name already exists" }, seq);
             return;
         }
-        Console.WriteLine($"[คลัง] {Short(EntityId)} เพิ่มแท็บ '{msg.SectionName}' ใน {msg.EntityId[..Math.Min(8, msg.EntityId.Length)]}");
+        Console.WriteLine($"[warehouse] {Short(EntityId)} เพิ่มแท็บ '{msg.SectionName}' ใน {msg.EntityId[..Math.Min(8, msg.EntityId.Length)]}");
         _world.Save();
         Send(default(OK), seq);
     }
@@ -375,13 +375,13 @@ public partial class Player
         int idx = _context.InventoryItems.FindIndex(it => it.Id == msg.ItemId);
         if (idx < 0)
         {
-            Send(new Abort { Text = "ไม่พบไอเทมในกระเป๋า" }, seq);
+            Send(new Abort { Text = "Item not found in inventory" }, seq);
             return;
         }
         Item item = _context.InventoryItems[idx];
         if (_lockedItemIds.Contains(item.Id))
         {
-            Send(new Abort { Text = "ไอเทมถูกล็อกอยู่" }, seq);
+            Send(new Abort { Text = "Item is locked" }, seq);
             return;
         }
         // ── [6 ก.ย. 2026] บังเหียนที่มีสัตว์เชื่องแล้วอยู่ข้างใน = "ผูกพัน" (귀속) ──────────
@@ -397,7 +397,7 @@ public partial class Player
         {
             if (!TryImprintRein(item, out string imprintError))
             {
-                Send(new Abort { Text = imprintError ?? "ใช้บังเหียนนี้ไม่ได้" }, seq);
+                Send(new Abort { Text = imprintError ?? "This bridle cannot be used" }, seq);
                 return;
             }
             _context.InventoryItems.RemoveAt(idx);
@@ -421,7 +421,7 @@ public partial class Player
             // ไม่ใช่ของกิน — ของใช้ชนิดอื่น (ยา/กล่องสุ่ม/หนังสือสูตร) ยังไม่มีระบบรองรับ
             // ตอบ Abort เพื่อให้ข้อความขึ้นบนจอ ดีกว่าเงียบแล้วผู้เล่นกดซ้ำไปเรื่อย ๆ
             // (client/GameManager.cs:303-306 DefaultAbortHandler → UIManager.SystemMsg)
-            Send(new Abort { Text = "ยังใช้ไอเทมชนิดนี้ไม่ได้" }, seq);
+            Send(new Abort { Text = "This item type cannot be used yet" }, seq);
             return;
         }
 
@@ -514,7 +514,7 @@ public partial class Player
         int idx = _context.InventoryItems.FindIndex(it => it.Id == msg.ItemId);
         if (idx < 0)
         {
-            Send(new Abort { Text = "ไม่พบไอเทมที่จะซ่อม" }, seq);
+            Send(new Abort { Text = "Item to repair not found" }, seq);
             return;
         }
         // ต้องมีชุดซ่อมอยู่ในกระเป๋าจริงทุกชิ้น ไม่งั้นซ่อมฟรี
@@ -531,7 +531,7 @@ public partial class Player
         }
         if (kits.Count == 0)
         {
-            Send(new Abort { Text = "ไม่มีชุดซ่อม" }, seq);
+            Send(new Abort { Text = "Repair kit not found" }, seq);
             return;
         }
 
@@ -575,7 +575,7 @@ public partial class Player
     {
         if (msg.Channel == ColorChannel.Invalid || msg.Materials == null || msg.Materials.Count == 0)
         {
-            Send(new Abort { Text = "ข้อมูลย้อมสีไม่ครบ" }, seq);
+            Send(new Abort { Text = "Dye data is incomplete" }, seq);
             return;
         }
         var ids = msg.Materials.Values
@@ -599,7 +599,7 @@ public partial class Player
         }
         if (targetIdx < 0 || dyeIdx < 0)
         {
-            Send(new Abort { Text = "ย้อมสีชิ้นนี้ไม่ได้" }, seq);
+            Send(new Abort { Text = "This item cannot be dyed" }, seq);
             return;
         }
 
@@ -661,7 +661,7 @@ public partial class Player
             SendEquipments();
             return;
         }
-        Send(new Abort { Text = "ยังมีชุดสวมใส่ชุดเดียว" }, seq);
+        Send(new Abort { Text = "Only one equipment set is currently available" }, seq);
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════
@@ -744,8 +744,8 @@ public partial class Player
     /// </summary>
     private void HandlePutInItemMsg(PutInItem msg, uint seq)
     {
-        Console.WriteLine($"[item] ปฏิเสธ PutInItem เข้า {msg.EntityId} — ยังไม่มีทางเอาของออก (TakeOutItem ถูกจองให้หุ่นโชว์เสื้อ)");
-        Send(new Abort { Text = "ยังเก็บของเข้าตู้ไม่ได้ ใช้คลังสินค้าแทน" }, seq);
+        Console.WriteLine($"[item] Rejected PutInItem for {msg.EntityId}; there is no item-removal path yet (TakeOutItem is reserved for mannequins)");
+        Send(new Abort { Text = "Storing items in containers is not available yet; use the warehouse instead" }, seq);
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════
@@ -807,7 +807,7 @@ public partial class Player
         List<Item> section = WarehouseStore.Items(msg.EntityId, msg.SectionName, create: false);
         if (section == null)
         {
-            Send(new Abort { Text = "ไม่พบแท็บคลังนี้" });
+            Send(new Abort { Text = "Warehouse tab not found" });
             return;
         }
         int free = ItemConstants.WarehouseSectionSize - WarehouseStore.UsedSize(msg.EntityId, msg.SectionName);
@@ -827,7 +827,7 @@ public partial class Player
         }
         if (moved.Count == 0)
         {
-            Send(new Abort { Text = "คลังเต็ม" });
+            Send(new Abort { Text = "Warehouse is full" });
             return;
         }
         Send(new InventoryUpdated
@@ -868,7 +868,7 @@ public partial class Player
         }
         if (moved.Count == 0)
         {
-            Send(new Abort { Text = "กระเป๋าเต็ม" });
+            Send(new Abort { Text = "Inventory is full" });
             return;
         }
         Send(new InventoryUpdated
@@ -907,7 +907,7 @@ public partial class Player
         }
         if (moved.Count == 0)
         {
-            Send(new Abort { Text = "แท็บปลายทางเต็ม" });
+            Send(new Abort { Text = "Destination tab is full" });
             return;
         }
         SendWarehouseUpdated(msg.EntityId, msg.SourceSectionName, null, moved.Select(it => it.Id).ToArray());
@@ -994,44 +994,44 @@ public partial class Player
         // ⚠️ ห้ามตอบ CargoReceiver ปลอม เพราะของที่ส่งไปจะหายจริง ๆ (ไม่มีที่เก็บปลายทาง)
         _connection.Recv(delegate(SendCargo msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีระบบส่งของข้ามเกาะ" }, header.Seq);
+            Send(new Abort { Text = "Cross-island item delivery is not available yet" }, header.Seq);
         });
         // ยิงทิ้งอัตโนมัติตอนเปิดหน้าต่าง — เงียบไว้
         _connection.Recv(delegate(ActivateCargoReceiver msg, PacketHeader header) { });
         // ผู้เล่นกดปุ่มยึดครองเอง (client/Durango.UI/CargoWarpholeGroup.cs:125-132 ไม่รอ reply)
         _connection.Recv(delegate(OccupyCargoWarphole msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีระบบยึดครองตู้ขนส่ง" });
+            Send(new Abort { Text = "Cargo container claiming is not available yet" });
         });
         // ตั้งค่าภาษี/โอนเข้ากองทุนแคลน — ยังไม่มีระบบแคลนและเงิน
         _connection.Recv(delegate(SetCargoWarpholeTaxRate msg, PacketHeader header) { });
         // client/EstateSystem.cs:620-627 รอ ClanCargoWarphole — ไม่มีแคลน จึงตอบ Abort ให้เลิกรอ
         _connection.Recv(delegate(CargoWarpholeTaxToClanFund msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีระบบแคลน" }, header.Seq);
+            Send(new Abort { Text = "Clan systems are not available yet" }, header.Seq);
         });
         // ── กรงสัตว์ ────────────────────────────────────────────────────────────────────
         // client/PetManager.cs:890-905 และ :1117-1132 ใช้ .All(Packet.IsSuccess) ⇒ Abort = onResult(false)
         _connection.Recv(delegate(TakeOutFromCage msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีระบบกรงสัตว์" }, header.Seq);
+            Send(new Abort { Text = "Animal cages are not available yet" }, header.Seq);
         });
         _connection.Recv(delegate(TakeOutReinFromCage msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีระบบกรงสัตว์" }, header.Seq);
+            Send(new Abort { Text = "Animal cages are not available yet" }, header.Seq);
         });
         // ── ที่ดิน/สมาคม ────────────────────────────────────────────────────────────────
         // client/EstateSystem.cs:678-692 .All(Packet.IsSuccess) — ยังไม่มีระบบแต้มบุกเบิก
         // ⚠️ ห้ามตอบ OK เด็ดขาด เพราะ client จะถือว่าไอเทมถูกใช้ไปแล้ว
         _connection.Recv(delegate(UseItemsForPioneerPoint msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีระบบแต้มบุกเบิก" }, header.Seq);
+            Send(new Abort { Text = "Pioneer points are not available yet" }, header.Seq);
         });
         // client/FactionSystem.cs:397-406 ยิงทิ้งไม่รอ reply — ผู้เล่นเป็นคนกดส่งของให้สมาคม
         _connection.Recv(delegate(DeliverItems msg, PacketHeader header)
         {
-            Console.WriteLine($"[item] DeliverItems ({msg.FactionType}) {msg.ItemIds?.Length ?? 0} ชิ้น — ยังไม่มีระบบสมาคม");
-            Send(new Abort { Text = "ยังไม่มีระบบสมาคม" });
+            Console.WriteLine($"[item] DeliverItems ({msg.FactionType}) {msg.ItemIds?.Length ?? 0} items; faction delivery is not implemented yet");
+            Send(new Abort { Text = "Faction systems are not available yet" });
         });
     }
 
@@ -1357,7 +1357,7 @@ double? effectTime = null;
             if (string.IsNullOrEmpty(expr)) return 0f;
             if (Formula.TryEval(expr, level, out float v)) return v;
             // คิดไม่ออก = ไม่ให้ผล ดีกว่าเดาเลข — และต้องเห็นใน log ว่ามีสูตรแบบไหนที่ยังไม่รองรับ
-            Console.WriteLine($"[item] คิดสูตรอาหารไม่ได้: \"{expr}\" — ข้ามค่านี้ไป");
+            Console.WriteLine($"[item] Could not evaluate food formula: \"{expr}\"; skipping this value");
             return 0f;
         }
     }
