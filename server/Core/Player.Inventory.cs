@@ -365,7 +365,7 @@ public partial class Player
             Send(new Abort { Text = "A tab with this name already exists" }, seq);
             return;
         }
-        Console.WriteLine($"[warehouse] {Short(EntityId)} เพิ่มแท็บ '{msg.SectionName}' ใน {msg.EntityId[..Math.Min(8, msg.EntityId.Length)]}");
+        Console.WriteLine($"[warehouse] {Short(EntityId)} added tab '{msg.SectionName}' to {msg.EntityId[..Math.Min(8, msg.EntityId.Length)]}");
         _world.Save();
         Send(default(OK), seq);
     }
