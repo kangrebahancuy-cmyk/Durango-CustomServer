@@ -205,7 +205,7 @@ public class World
         if (placed > 0)
         {
             Save();
-            Console.WriteLine($"[world] วางจุดสำคัญของเกาะ {placed} จุด " +
+            Console.WriteLine($"[world] Placed {placed} island points of interest " +
                               $"(ports {pois.PortPoints.Count} · warp holes {pois.Warpholes.Count} · " +
                               $"rifts {pois.Rifts.Count} · craters {pois.Craters.Count})");
         }
@@ -626,7 +626,7 @@ public class World
             if (now < entry.DueAt) continue;
             queue.RemoveAt(i);
             var tile = new Point2(entry.X, entry.Y);
-            AddNatural(tile, entry.EntityType);   // broadcast GardenDiff ให้เอง + Save()
+            AddNatural(tile, entry.EntityType);   // Broadcasts GardenDiff and saves automatically.
             Console.WriteLine($"[ecology] Natural object type {entry.EntityType} regrew at ({entry.X},{entry.Y})");
         }
     }
