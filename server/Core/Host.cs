@@ -543,7 +543,7 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
         long median = amounts.Count == 0 ? 0 : amounts[amounts.Count / 2];
         rows.Sort((a, b) => ((long)b["t_stone"]).CompareTo((long)a["t_stone"]));
 
-        // ช่วงยอดเงิน — ดูการกระจุกตัว ถ้าคนไม่กี่คนถือเงินเกือบทั้งระบบแปลว่าก๊อกรั่วที่ใครบางคน
+// Balance buckets reveal concentration; if a few players hold most currency, investigate possible abuse.
         var buckets = new Dictionary<string, int>
         {
             ["0"] = 0, ["1-999"] = 0, ["1k-9,999"] = 0,
@@ -579,8 +579,8 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
     }
 
     /// <summary>
-    /// ดันยอดเงินใหม่ไปให้ผู้เล่นที่ออนไลน์อยู่ — คืน false ถ้าไม่ได้ออนไลน์
-    /// (ไม่ออนไลน์ก็ไม่เป็นไร เพราะยอดอยู่ในไฟล์เซฟแล้ว เดี๋ยวเข้ามาก็เห็นเอง)
+/// Push an updated balance to an online player; returns false if the player is offline.
+/// Offline balances are already saved to disk and will be visible when the player reconnects.
     /// </summary>
     public bool PushWalletTo(string entityId)
     {
@@ -594,7 +594,7 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
         return false;
     }
 
-    /// <summary>เตะผู้เล่นออกจากเกม — คืน false ถ้าไม่ได้ออนไลน์อยู่</summary>
+/// <summary>Kick a player from the game; returns false if they are not online.</summary>
     public bool KickPlayer(string entityId, string reason)
     {
         if (string.IsNullOrEmpty(entityId)) return false;
@@ -603,7 +603,7 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
             foreach (Player player in world.PlayersSnapshot())
             {
                 if (player.EntityId != entityId) continue;
-                Console.WriteLine($"[ดูแล] เตะ {entityId} — {reason}");
+        Console.WriteLine($"[admin] Kicked {entityId}: {reason}");
                 player.KickWith(reason);
                 return true;
             }
@@ -611,7 +611,7 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
         return false;
     }
 
-    /// <summary>ประกาศถึงทุกคนที่ออนไลน์ — คืนจำนวนคนที่ได้รับ</summary>
+/// <summary>Broadcast a message to all online players and return the number reached.</summary>
     public int Announce(string text)
     {
         int sent = 0;
@@ -623,11 +623,11 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
                 sent++;
             }
         }
-        Console.WriteLine($"[ดูแล] ประกาศถึง {sent} คน: {text}");
+        Console.WriteLine($"[admin] Broadcast to {sent} players: {text}");
         return sent;
     }
 
-    /// <summary>โลกทั้งหมดที่เปิดอยู่ (เกาะเดียวหรือหลายเกาะแล้วแต่โหมด)</summary>
+/// <summary>All active worlds, whether the server currently uses one island or several.</summary>
     private IEnumerable<World> WorldsOf()
     {
         if (Worlds != null)
@@ -641,17 +641,17 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
         if (GameServer?.World != null) yield return GameServer.World;
     }
 
-    /// <summary>บัญชีเปล่า — ใช้ตอบคำขอที่ไม่มีกุญแจบัญชี</summary>
+/// <summary>Empty account used for requests that do not provide an account key.</summary>
     public static Account EmptyAccount() => new() { PlayerSlotCount = 0, MaxPlayerSlotCount = 2 };
 
     /// <summary>
-    /// รายชื่อตัวละคร **ของบัญชีนี้เท่านั้น** (เทียบเท่า Cluster.OnRequestAccount ต้นฉบับ)
+/// Return only characters belonging to this account (equivalent to the original Cluster.OnRequestAccount).
     ///
-    /// ⚠️ เดิมคืนตัวละครทุกตัวบนเซิร์ฟให้ทุกคน ⇒ ใครก็กดเข้าเล่นตัวละครคนอื่นได้จากหน้า Title
-    /// (เหตุผลเต็มที่ Core/Gateway.cs เส้น /accounts)
+/// ⚠️ Previously every character on the server was returned to everyone, allowing character selection from the title screen.
+/// See the /accounts route in Core/Gateway.cs for the full explanation.
     ///
-    /// <c>MaxPlayerSlotCount</c> ต้องมากกว่าจำนวนตัวที่มีเสมอ ไม่งั้นปุ่ม "สร้างตัวใหม่" หายไป —
-    /// ฝั่งเกมโชว์ปุ่มนั้นเฉพาะช่องที่ index &lt; availableSlotCount
+/// <c>MaxPlayerSlotCount</c> must exceed the number of existing characters or the Create Character button disappears.
+/// The client shows that button only when index &lt; availableSlotCount.
     /// (client/Durango.UI/TitlePlayerSelectionGroupBase.cs:89-97)
     /// </summary>
     public Account BuildAccount(string ownerKey)
@@ -663,13 +663,13 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
         {
             PlayerContext player = context.Player;
 
-            // ตัวละครกำพร้า — รับเป็นของบัญชีแรกที่เข้ามา เฉพาะตอนเปิดสวิตช์ย้ายข้อมูล
+// Unowned characters can be adopted by the first account only when the migration switch is enabled.
             if (string.IsNullOrEmpty(player.OwnerKey) && AdoptOrphans)
             {
                 player.OwnerKey = ownerKey;
                 player.Save();
-                Console.WriteLine($"[บัญชี] ตัวละครกำพร้า '{player.PlayerInfo.PlayerName}' " +
-                                  $"({player.EntityId}) → บัญชี {AccountKeys.ForLog(ownerKey)}");
+            Console.WriteLine($"[account] Adopted unowned character '{player.PlayerInfo.PlayerName}' " +
+                $"({player.EntityId}) → account {AccountKeys.ForLog(ownerKey)}");
             }
 
             if (!AccountKeys.Same(player.OwnerKey, ownerKey)) continue;
@@ -677,7 +677,7 @@ if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent
         }
 
         account.PlayerSlotCount = account.Players.Count;
-        // +1 เสมอเพื่อให้มีช่องว่างให้กดสร้างตัวใหม่ (ขั้นต่ำ 2 ตามเดิม)
+// Always add one slot so players can create another character; minimum remains 2.
         account.MaxPlayerSlotCount = Math.Max(2, account.Players.Count + 1);
         return account;
     }
