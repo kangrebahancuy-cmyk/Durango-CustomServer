@@ -2,7 +2,7 @@
   "Version": "0.1.6",
   "ZipUrl": "https://github.com/ShuuuuShi/Durango-TH-Client/releases/download/DurangoTH/DurangoTH-Clean.zip",
   "Sha256": "2e04cee56bff7bb88e72b6b66d503c99cc9d8be1ba2cf7bf402167742c088b56",
-  "Notes": "0.1.6 — รันเชอร์ทำหน้าที่อัปเดตแทน DurangoUpdater (โหลดเฉพาะไฟล์ที่เปลี่ยน + ตรวจ/ซ่อมไฟล์ 4,457 ไฟล์อัตโนมัติ) · บังคับเปิดผ่าน DinoWorldLauncher.exe เท่านั้น (เอา เล่นเกม.bat กับ DurangoUpdater.exe ออก) · เลขเวอร์ชันตรงกันทุกจุด (Client/Server โชว์ 0.1.6) · แก้หมุนสิ่งปลูกสร้างแล้วโมเดลหาย · แก้ปุ่มหน้าไตเติลทับกัน",
+  "Notes": "EN: Version 0.1.6. The launcher updates the game instead of DurangoUpdater, downloads changed files only, and verifies or repairs 4,457 files automatically. Launch only through DinoWorldLauncher.exe; the old Play Game batch file and DurangoUpdater.exe are removed. Client and server version labels are synchronized. Fixed missing building models after rotation and overlapping title-screen buttons. | ID: Versi 0.1.6. Launcher memperbarui game sebagai pengganti DurangoUpdater, hanya mengunduh file yang berubah, serta memeriksa atau memperbaiki 4.457 file secara otomatis. Game hanya boleh dijalankan melalui DinoWorldLauncher.exe; file batch Play Game dan DurangoUpdater.exe lama dihapus. Label versi client dan server disamakan. Memperbaiki model bangunan yang hilang setelah diputar dan tombol layar judul yang bertumpuk.",
   "Files": [
     {
       "Path": "Durango_Data/Managed/Assembly-CSharp.dll",
