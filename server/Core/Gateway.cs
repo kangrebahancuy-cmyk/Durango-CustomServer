@@ -96,6 +96,60 @@ public class Gateway
 
     private void RegisterRoutes()
     {
+        // Username/password account API. The legacy game client still sends account_id directly;
+        // client-side login integration must persist this returned account_id before enforcing auth.
+        _webServer.PostRoute["/auth/register"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
+        {
+            string remoteIp = request?.RemoteEndPoint?.Address?.ToString() ?? "?";
+            if (!AccountStore.TryConsumeAttempt(remoteIp))
+                return new WebServer.JsonResponse(new JObject { ["error"] = "rate_limited" }.ToString(), HttpStatusCode.TooManyRequests);
+
+            string accountId;
+            AccountStore.RegisterResult result = AccountStore.Register(postData.Get("username"), postData.Get("password"), out accountId);
+            switch (result)
+            {
+                case AccountStore.RegisterResult.Created:
+                    Console.WriteLine($"[account] Registered username '{postData.Get("username")}' from {remoteIp}");
+                    return new WebServer.JsonResponse(new JObject
+                    {
+                        ["ok"] = true,
+                        ["username"] = postData.Get("username").Trim(),
+                        ["account_id"] = accountId
+                    }.ToString(), HttpStatusCode.Created);
+                case AccountStore.RegisterResult.InvalidUsername:
+                    return new WebServer.JsonResponse(new JObject { ["error"] = "invalid_username", ["message"] = "Username must be 3-24 characters using letters, numbers, _ or -." }.ToString(), HttpStatusCode.BadRequest);
+                case AccountStore.RegisterResult.InvalidPassword:
+                    return new WebServer.JsonResponse(new JObject { ["error"] = "invalid_password", ["message"] = "Password must be 10-128 characters." }.ToString(), HttpStatusCode.BadRequest);
+                case AccountStore.RegisterResult.UsernameTaken:
+                    return new WebServer.JsonResponse(new JObject { ["error"] = "username_taken" }.ToString(), HttpStatusCode.Conflict);
+                default:
+                    return new WebServer.JsonResponse(new JObject { ["error"] = "account_storage_error" }.ToString(), HttpStatusCode.InternalServerError);
+            }
+        };
+
+        _webServer.PostRoute["/auth/login"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
+        {
+            string remoteIp = request?.RemoteEndPoint?.Address?.ToString() ?? "?";
+            if (!AccountStore.TryConsumeAttempt(remoteIp))
+                return new WebServer.JsonResponse(new JObject { ["error"] = "rate_limited" }.ToString(), HttpStatusCode.TooManyRequests);
+
+            string accountId, username;
+            AccountStore.LoginResult result = AccountStore.Login(postData.Get("username"), postData.Get("password"), out accountId, out username);
+            if (result == AccountStore.LoginResult.Success)
+            {
+                Console.WriteLine($"[account] Login succeeded for '{username}' from {remoteIp}");
+                return new WebServer.JsonResponse(new JObject
+                {
+                    ["ok"] = true,
+                    ["username"] = username,
+                    ["account_id"] = accountId
+                }.ToString());
+            }
+            if (result == AccountStore.LoginResult.StorageError)
+                return new WebServer.JsonResponse(new JObject { ["error"] = "account_storage_error" }.ToString(), HttpStatusCode.InternalServerError);
+            return new WebServer.JsonResponse(new JObject { ["error"] = "invalid_credentials" }.ToString(), HttpStatusCode.Unauthorized);
+        };
+
         _webServer.GetRoute["/knock"] = delegate(HttpListenerRequest request, Dictionary<string, string> postData)
         {
             string platform = PlatformKey(request.QueryString.Get("platform"));
