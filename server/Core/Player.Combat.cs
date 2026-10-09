@@ -230,7 +230,7 @@ public static class BattleDataStore
                 }
             }
             _loaded = true;
-            Console.WriteLine($"[combat] โหลดท่าต่อสู้ {_actions.Count} ท่า · tag→ท่า {_tagActions.Count} กลุ่ม · " +
+            Console.WriteLine($"[combat] Loaded {_actions.Count} combat actions · {_tagActions.Count} tag-to-action groups · " +
                               $"ชนิดอาวุธ {_weaponAttackTypes.Count} แบบ");
         }
     }
@@ -430,7 +430,7 @@ public partial class Player
         BattleActionData action = BattleDataStore.Action(msg.ActionId);
         if (action?.meta == null)
         {
-            Console.WriteLine($"[combat] ไม่รู้จักท่า '{msg.ActionId}'");
+            Console.WriteLine($"[combat] Unknown action '{msg.ActionId}'");
             return;
         }
         // ค่าความอึดที่ท่าใช้ — ตัวเลขจริงจาก player_battle_actions.json → meta.stamina
@@ -448,7 +448,7 @@ public partial class Player
         if (attack == null) return;                          // ท่าหลบ (onehand_dodge ฯลฯ) ไม่มีดาเมจ
 
         string targetId = msg.TargetEntityId ?? _battleTargetId;
-        Console.WriteLine($"[combat] {Short(EntityId)} ใช้ท่า {msg.ActionId} → เป้า '{targetId ?? "(ไม่มี)"}'");
+        Console.WriteLine($"[combat] {Short(EntityId)} used action {msg.ActionId} → target '{targetId ?? "(none)"}'");
         Player victim = TryResolveVictim(targetId);
         if (victim != null)
         {
@@ -750,7 +750,7 @@ public partial class Player
         SetBattleMode(false);
         _battleAnimalId = null;
         _world.BroadCast(new EntityDied { EntityId = EntityId, At = Times.UnixTimeNow() });
-        Console.WriteLine($"[combat] {EntityId[..Math.Min(8, EntityId.Length)]} ตาย (ครั้งที่ {_deathCount})");
+        Console.WriteLine($"[combat] {EntityId[..Math.Min(8, EntityId.Length)]} died (death count {_deathCount})");
         OnContextChanged();
     }
 
@@ -781,7 +781,7 @@ public partial class Player
         {
             // ไฟล์ constants.json อ่านไม่ได้ — ไม่ใช่ค่าสมดุลของเกม แค่กันผู้เล่นฟื้นมาโดยเลือดยังเป็น 0
             // (ฟื้นแล้วเลือด 0 = ยืนนิ่งรอตายซ้ำโดยไม่มีอะไรบอก)
-            Console.WriteLine("[combat] ⚠️ ไม่พบ death_penalty/revive_immediately ใน constants.json — ฟื้นแบบเต็มหลอด");
+            Console.WriteLine("[combat] ⚠️ death_penalty/revive_immediately not found in constants.json; restoring full gauges");
             ratios = new Dictionary<string, float>
             {
                 { SurvivalState.KeyLife, 1f },
