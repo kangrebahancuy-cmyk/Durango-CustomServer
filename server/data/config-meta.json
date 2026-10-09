@@ -494,7 +494,7 @@
       "v": "\"fur_box_03_leaf\""
     }
   },
-  "(ทั่วไป)": {
+  "General": {
     "Spawn": {
       "t": "List<SpawnEntryConfig>",
       "d": "",
