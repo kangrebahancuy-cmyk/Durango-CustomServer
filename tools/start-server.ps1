@@ -59,7 +59,8 @@ function Start-Server {
     $escapedLog = $LogFile.Replace("'", "''")
     $command = "& dotnet '$escapedDll' --name nx --gateway-port 8190 --game-port 8191 *>> '$escapedLog'"
     try {
-        $process = Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $command) -WorkingDirectory $Root -PassThru
+        $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+        $process = Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoExit", "-ExecutionPolicy", "Bypass", "-EncodedCommand", $encodedCommand) -WorkingDirectory $Root -PassThru
         Start-Sleep -Seconds 2
         if ($process.HasExited) {
             Write-Host "[ERROR] Jendela proses server langsung berhenti. Periksa log: $LogFile" -ForegroundColor Red
