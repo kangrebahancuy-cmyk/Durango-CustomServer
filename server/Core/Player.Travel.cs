@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using Newtonsoft.Json.Linq;
 using Durango.Network;
 using Messages;
 using Shared.Estate;
@@ -87,6 +89,50 @@ public partial class Player
 
     private void RegisterTravelHandlers()
     {
+        // Tamed Island menu: the client requests the list with message 2130 and expects
+        // IslandTravelOptions (2131) in the same request sequence. Read the admin-managed
+        // islands.json so the menu follows the server configuration.
+        _connection.Recv(delegate(GetIslandTravelOptions msg, PacketHeader header)
+        {
+            try
+            {
+                string islandsPath = Path.Combine(Json.DataDir, "islands.json");
+                JArray islands = JObject.Parse(File.ReadAllText(islandsPath))["Islands"] as JArray;
+                var entries = (islands ?? new JArray())
+                    .OfType<JObject>()
+                    .Where(item => !string.IsNullOrWhiteSpace((string)item["Id"]))
+                    .ToArray();
+
+                Send(new IslandTravelOptions
+                {
+                    Ids = entries.Select(item => (string)item["Id"]).ToArray(),
+                    Names = entries.Select(item =>
+                    {
+                        string name = (string)item["Name"];
+                        string id = (string)item["Id"];
+                        return string.IsNullOrWhiteSpace(name) ? id : name;
+                    }).ToArray(),
+                    RequiredLevels = entries.Select(item =>
+                    {
+                        int level;
+                        return int.TryParse((string)item["RequiredLevel"], out level) ? Math.Max(0, level) : 1;
+                    }).ToArray()
+                }, header.Seq);
+
+                Console.WriteLine($"[travel] {Short(EntityId)} requested Tamed Island options; sent {entries.Length} islands");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"[travel] Could not load islands.json: {e.Message}");
+                Send(new IslandTravelOptions
+                {
+                    Ids = Array.Empty<string>(),
+                    Names = Array.Empty<string>(),
+                    RequiredLevels = Array.Empty<int>()
+                }, header.Seq);
+            }
+        });
+
         // ── กลุ่มที่ 1: วาร์ปในเกาะเดียวกัน — **ทำของจริงได้** ──────────────────────────────
 
         // GetWarpCosts (2106) — ราคาวาร์ปของรูวาร์ปแต่ละแห่งบนเกาะนี้
