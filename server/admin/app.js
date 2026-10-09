@@ -15,12 +15,12 @@
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
-    // Auto-detect server URL จากหน้าเว็บปัจจุบัน
+    // Auto-detect the server URL from the current page.
     $('#server-url').value = window.location.origin;
 
     // ── API Helper ─────────────────────────────────────────────────────────────
     async function api(method, path, body) {
-        // ส่ง token ผ่าน query param เพื่อความเข้ากันได้ (header อาจถูก block โดย browser)
+        // Send the token as a query parameter for compatibility with browsers that block headers.
         const sep = path.includes('?') ? '&' : '?';
         const url = serverUrl + path + sep + 'token=' + encodeURIComponent(adminToken);
         const headers = {};
@@ -52,14 +52,14 @@
         try {
             const health = await api('GET', '/health');
             if (health.error || health._raw?.includes('403')) {
-                $('#login-error').textContent = 'Token ไม่ถูกต้องหรือเซิร์ฟไม่ตอบ';
+                $('#login-error').textContent = 'Invalid token or server did not respond';
                 return;
             }
             $('#login-screen').classList.remove('active');
             $('#app-screen').classList.add('active');
             loadDashboard();
         } catch (err) {
-            $('#login-error').textContent = 'เชื่อมต่อเซิร์ฟไม่ได้: ' + err.message;
+            $('#login-error').textContent = 'Could not connect to server: ' + err.message;
         }
     });
 
@@ -81,12 +81,12 @@
         });
     });
 
-    // ══ เศรษฐกิจ — เฝ้าเงินเฟ้อ ═════════════════════════════════════════════════
-    // เซิร์ฟใช้สกุลเดียวคือ T Stone (server/Core/Player.Wallet.cs)
-    // ตัวเลข ณ จุดเดียวบอกอะไรไม่ได้ ต้องดูส่วนต่างตามเวลา ⇒ จำค่าครั้งก่อนไว้เทียบให้
+    // Economy monitoring and inflation tracking.
+    // The server uses one currency: T Stone (server/Core/Player.Wallet.cs).
+    // A single snapshot is not enough; retain the previous values to compare changes over time.
     let lastEconomy = null;
 
-    const fmt = (n) => Number(n || 0).toLocaleString('th-TH');
+    const fmt = (n) => Number(n || 0).toLocaleString(window.DurangoI18n?.language === 'id' ? 'id-ID' : 'en-US');
 
     async function loadEconomy() {
         const box = $('#eco-top');
@@ -99,7 +99,7 @@
             $('#eco-median').textContent = fmt(d.median);
             $('#eco-max').textContent = fmt(d.max);
 
-            // ส่วนต่างจากครั้งก่อน — บวกเร็วกว่าจำนวนคนโต = ก๊อกแรงกว่าท่อระบาย
+            // ส่วนต่างจากครั้งก่อน — บวกเร็วกว่าCharactersโต = ก๊อกแรงกว่าท่อระบาย
             const now = Date.now();
             if (lastEconomy) {
                 const dt = Math.max(1, (now - lastEconomy.at) / 1000);
@@ -109,27 +109,27 @@
                 const cls = dTotal > 0 ? 'error-text' : '';
                 $('#eco-delta').innerHTML =
                     '<div class="' + cls + '">' +
-                    'เงินรวมเปลี่ยน <b>' + (dTotal >= 0 ? '+' : '') + fmt(dTotal) + '</b> ' +
-                    'ใน ' + Math.round(dt) + ' วินาที (≈ ' + (perHour >= 0 ? '+' : '') + fmt(perHour) + ' /ชม.)<br>' +
-                    'ตัวละครเปลี่ยน ' + (dChars >= 0 ? '+' : '') + fmt(dChars) +
+                    'Total funds changed <b>' + (dTotal >= 0 ? '+' : '') + fmt(dTotal) + '</b> ' +
+                    'in ' + Math.round(dt) + ' seconds (≈ ' + (perHour >= 0 ? '+' : '') + fmt(perHour) + ' /hr.)<br>' +
+                    'Characters changed ' + (dChars >= 0 ? '+' : '') + fmt(dChars) +
                     '</div>';
             }
             lastEconomy = { at: now, total: d.total_tstone, chars: d.character_count };
 
             const b = d.buckets || {};
-            $('#eco-buckets').innerHTML = '<table class="data-table"><thead><tr><th>ช่วงยอดเงิน</th><th>จำนวนคน</th></tr></thead><tbody>' +
+            $('#eco-buckets').innerHTML = '<table class="data-table"><thead><tr><th>Balance range</th><th>Characters</th></tr></thead><tbody>' +
                 Object.keys(b).map((k) => '<tr><td>' + k + '</td><td>' + fmt(b[k]) + '</td></tr>').join('') +
                 '</tbody></table>';
 
             const rows = d.top || [];
             box.innerHTML = rows.length === 0
-                ? 'ยังไม่มีตัวละครที่มีเงิน'
-                : '<table class="data-table"><thead><tr><th>ชื่อ</th><th>T Stone</th><th>ออนไลน์</th></tr></thead><tbody>' +
+                ? 'No characters have funds yet'
+                : '<table class="data-table"><thead><tr><th>Name</th><th>T Stone</th><th>Online</th></tr></thead><tbody>' +
                   rows.map((r) => '<tr><td>' + (r.name || r.entity_id) + '</td><td>' + fmt(r.t_stone) + '</td><td>' +
                                   (r.online ? '●' : '') + '</td></tr>').join('') +
                   '</tbody></table>';
         } catch (e) {
-            box.textContent = 'โหลดไม่สำเร็จ: ' + e.message;
+            box.textContent = 'Failed to load: ' + e.message;
         }
     }
 
@@ -178,7 +178,7 @@
                 html += '</table>';
                 $('#online-players-list').innerHTML = html;
             } else {
-                $('#online-players-list').innerHTML = '<div class="empty-state"><div class="icon">👤</div>ไม่มีผู้เล่นออนไลน์</div>';
+                $('#online-players-list').innerHTML = '<div class="empty-state"><div class="icon">👤</div>No online players</div>';
             }
 
             // Unhandled packets
@@ -192,7 +192,7 @@
                 html += '</table>';
                 $('#unhandled-packets').innerHTML = html;
             } else {
-                $('#unhandled-packets').textContent = 'ไม่มี — ทุก packet type มี handler แล้ว ✓';
+                $('#unhandled-packets').textContent = 'None — all packet types have handlers ✓';
             }
         } catch (err) {
             console.error('Dashboard load error:', err);
@@ -212,7 +212,7 @@
                 api('GET', '/admin/config'),
                 api('GET', '/admin/config/meta')
             ]);
-            if (cfg.error) { alert('ไม่สามารถโหลด config: ' + cfg.error); return; }
+            if (cfg.error) { alert('Could not load config: ' + cfg.error); return; }
             configData = cfg;
             configMeta = meta.error ? null : meta;
             renderConfigEditor();
@@ -259,7 +259,7 @@
                     try {
                         configData[section] = JSON.parse(ta.value);
                     } catch (e) {
-                        alert('JSON ผิดรูปแบบ: ' + e.message);
+                        alert('Invalid JSON: ' + e.message);
                     }
                 });
                 body.appendChild(ta);
@@ -275,7 +275,7 @@
         if (configData.Spawn) {
             const div = document.createElement('div');
             div.className = 'config-section';
-            div.innerHTML = `<div class="config-section-header"><span>▸ Spawn (สัตว์)</span><span class="arrow">▸</span></div>`;
+            div.innerHTML = `<div class="config-section-header"><span>▸ Spawn (Animals)</span><span class="arrow">▸</span></div>`;
             div.querySelector('.config-section-header').addEventListener('click', () => div.classList.toggle('open'));
             const body = document.createElement('div');
             body.className = 'config-section-body';
@@ -284,7 +284,7 @@
             ta.rows = 12;
             ta.value = JSON.stringify(configData.Spawn, null, 2);
             ta.addEventListener('change', () => {
-                try { configData.Spawn = JSON.parse(ta.value); } catch (e) { alert('JSON ผิดรูปแบบ: ' + e.message); }
+                try { configData.Spawn = JSON.parse(ta.value); } catch (e) { alert('Invalid JSON: ' + e.message); }
             });
             body.appendChild(ta);
             div.appendChild(body);
@@ -304,7 +304,7 @@
             ta.rows = 10;
             ta.value = JSON.stringify(configData.Zones, null, 2);
             ta.addEventListener('change', () => {
-                try { configData.Zones = JSON.parse(ta.value); } catch (e) { alert('JSON ผิดรูปแบบ: ' + e.message); }
+                try { configData.Zones = JSON.parse(ta.value); } catch (e) { alert('Invalid JSON: ' + e.message); }
             });
             body.appendChild(ta);
             div.appendChild(body);
@@ -315,7 +315,7 @@
         if (configData.Starter) {
             const div = document.createElement('div');
             div.className = 'config-section';
-            div.innerHTML = `<div class="config-section-header"><span>▸ Starter (ของเริ่มต้น)</span><span class="arrow">▸</span></div>`;
+            div.innerHTML = `<div class="config-section-header"><span>▸ Starter (Starting Items)</span><span class="arrow">▸</span></div>`;
             div.querySelector('.config-section-header').addEventListener('click', () => div.classList.toggle('open'));
             const body = document.createElement('div');
             body.className = 'config-section-body';
@@ -324,7 +324,7 @@
             ta.rows = 10;
             ta.value = JSON.stringify(configData.Starter, null, 2);
             ta.addEventListener('change', () => {
-                try { configData.Starter = JSON.parse(ta.value); } catch (e) { alert('JSON ผิดรูปแบบ: ' + e.message); }
+                try { configData.Starter = JSON.parse(ta.value); } catch (e) { alert('Invalid JSON: ' + e.message); }
             });
             body.appendChild(ta);
             div.appendChild(body);
@@ -384,15 +384,15 @@
     // Save Config
     $('#btn-save-config').addEventListener('click', async () => {
         const status = $('#config-status');
-        status.textContent = 'กำลังบันทึก...';
+        status.textContent = 'Saving...';
         status.className = 'status-text';
         try {
             const result = await api('POST', '/admin/config', { json: JSON.stringify(configData, null, 2) });
             if (result.saved) {
-                status.textContent = '✓ บันทึกสำเร็จ';
+                status.textContent = '✓ Saved successfully';
                 status.className = 'status-text success';
             } else {
-                status.textContent = '❌ ' + (result.error || 'ไม่ทราบสาเหตุ');
+                status.textContent = '❌ ' + (result.error || 'Unknown reason');
                 status.className = 'status-text error';
             }
         } catch (err) {
@@ -446,15 +446,15 @@
     // Save Features
     $('#btn-save-features').addEventListener('click', async () => {
         const status = $('#features-status');
-        status.textContent = 'กำลังบันทึก...';
+        status.textContent = 'Saving...';
         status.className = 'status-text';
         try {
             const result = await api('POST', '/admin/config', { json: JSON.stringify(configData, null, 2) });
             if (result.saved) {
-                status.textContent = '✓ บันทึกสำเร็จ';
+                status.textContent = '✓ Saved successfully';
                 status.className = 'status-text success';
             } else {
-                status.textContent = '❌ ' + (result.error || 'ไม่ทราบสาเหตุ');
+                status.textContent = '❌ ' + (result.error || 'Unknown reason');
                 status.className = 'status-text error';
             }
         } catch (err) {
@@ -515,15 +515,15 @@
     // Save Islands
     $('#btn-save-islands').addEventListener('click', async () => {
         const status = $('#islands-status');
-        status.textContent = 'กำลังบันทึก...';
+        status.textContent = 'Saving...';
         status.className = 'status-text';
         try {
             const result = await api('POST', '/admin/islands', { json: JSON.stringify(islandsData, null, 2) });
             if (result.saved) {
-                status.textContent = '✓ บันทึกสำเร็จ';
+                status.textContent = '✓ Saved successfully';
                 status.className = 'status-text success';
             } else {
-                status.textContent = '❌ ' + (result.error || 'ไม่ทราบสาเหตุ');
+                status.textContent = '❌ ' + (result.error || 'Unknown reason');
                 status.className = 'status-text error';
             }
         } catch (err) {
@@ -575,7 +575,7 @@
                 html += '</table>';
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<div class="empty-state"><div class="icon">👤</div>ไม่มีผู้เล่นออนไลน์</div>';
+                container.innerHTML = '<div class="empty-state"><div class="icon">👤</div>No online players</div>';
             }
         } catch (err) {
             console.error('Load online error:', err);
@@ -584,17 +584,17 @@
 
     // Kick/Ban global functions
     window._kick = async (entityId, name) => {
-        if (!confirm(`เตะ ${name} (${entityId})?`)) return;
-        const result = await api('POST', '/admin/kick', { entity_id: entityId, reason: 'เตะโดยผู้ดูแล' });
-        alert(result.kicked ? 'เตะสำเร็จ' : 'เตะไม่สำเร็จ');
+        if (!confirm(`Kick ${name} (${entityId})?`)) return;
+        const result = await api('POST', '/admin/kick', { entity_id: entityId, reason: 'Kicked by administrator' });
+        alert(result.kicked ? 'Kicked successfully' : 'Failed to kick');
         loadOnlinePlayers();
     };
 
     window._ban = async (entityId, name) => {
-        if (!confirm(`แบน ${name} (${entityId})? ผู้เล่นจะถูกเตะออกทันที`)) return;
-        const reason = prompt('เหตุผลที่แบน:', 'ถูกแบนโดยผู้ดูแล') || 'ถูกแบนโดยผู้ดูแล';
+        if (!confirm(`Ban ${name} (${entityId})? The player will be kicked immediately`)) return;
+        const reason = prompt('Ban reason:', 'Banned by administrator') || 'Banned by administrator';
         const result = await api('POST', '/admin/ban', { entity_id: entityId, reason });
-        alert(result.banned ? 'แบนสำเร็จ' : 'แบนไม่สำเร็จ: ' + (result.error || ''));
+        alert(result.banned ? 'Banned successfully' : 'Failed to ban: ' + (result.error || ''));
         loadOnlinePlayers();
     };
 
@@ -616,12 +616,12 @@
     $('#btn-save-whitelist').addEventListener('click', async () => {
         const status = $('#whitelist-status');
         const entries = $('#whitelist-editor').value;
-        status.textContent = 'กำลังบันทึก...';
+        status.textContent = 'Saving...';
         status.className = 'status-text';
         try {
             const result = await api('POST', '/admin/whitelist', { entries });
             if (result.saved) {
-                status.textContent = '✓ บันทึกสำเร็จ';
+                status.textContent = '✓ Saved successfully';
                 status.className = 'status-text success';
             } else {
                 status.textContent = '❌ ' + (result.error || '');
@@ -648,7 +648,7 @@
                 html += '</table>';
                 container.innerHTML = html;
             } else {
-                container.innerHTML = '<div class="empty-state"><div class="icon">✅</div>ไม่มีผู้เล่นที่ถูกแบน</div>';
+                container.innerHTML = '<div class="empty-state"><div class="icon">✅</div>No banned players</div>';
             }
         } catch (err) {
             console.error('Load bans error:', err);
@@ -664,7 +664,7 @@
 
         const viewer = $('#data-viewer');
         viewer.style.display = 'block';
-        viewer.textContent = 'กำลังโหลด...';
+        viewer.textContent = 'Loading...';
 
         try {
             const data = await api('GET', `/assets/${asset}`);
@@ -683,14 +683,14 @@
     // Announce
     $('#btn-announce').addEventListener('click', async () => {
         const text = $('#announce-text').value.trim();
-        if (!text) { alert('กรุณาใส่ข้อความ'); return; }
+        if (!text) { alert('Please enter a message'); return; }
         const result = await api('POST', '/admin/announce', { text });
         const el = $('#announce-result');
         if (result.sent != null) {
-            el.textContent = `✓ ส่งสำเร็จถึง ${result.sent} คน`;
+            el.textContent = `✓ Sent successfully to ${result.sent} players`;
             el.className = 'result-text success';
         } else {
-            el.textContent = '❌ ' + (result.error || 'ไม่ทราบสาเหตุ');
+            el.textContent = '❌ ' + (result.error || 'Unknown reason');
             el.className = 'result-text error';
         }
     });
@@ -699,26 +699,26 @@
     $('#btn-maintenance-on').addEventListener('click', async () => {
         const result = await api('POST', '/admin/maintenance', { on: '1' });
         const el = $('#maintenance-result');
-        el.textContent = result.maintenance ? '✓ เปิด Maintenance Mode แล้ว' : '❌ ' + (result.error || '');
+        el.textContent = result.maintenance ? '✓ Maintenance Mode enabled' : '❌ ' + (result.error || '');
         el.className = result.maintenance ? 'result-text success' : 'result-text error';
     });
 
     $('#btn-maintenance-off').addEventListener('click', async () => {
         const result = await api('POST', '/admin/maintenance', { on: '0' });
         const el = $('#maintenance-result');
-        el.textContent = !result.maintenance ? '✓ ปิด Maintenance Mode แล้ว' : '❌ ' + (result.error || '');
+        el.textContent = !result.maintenance ? '✓ Maintenance Mode disabled' : '❌ ' + (result.error || '');
         el.className = !result.maintenance ? 'result-text success' : 'result-text error';
     });
 
     // Reload
     $('#btn-reload-server').addEventListener('click', async () => {
         const el = $('#reload-result');
-        el.textContent = 'กำลัง reload...';
+        el.textContent = 'Reloading...';
         el.className = 'result-text';
         try {
             const result = await api('POST', '/admin/reload');
             if (result.reloaded) {
-                el.textContent = '✓ Reload สำเร็จ';
+                el.textContent = '✓ Reload successful';
                 el.className = 'result-text success';
             } else {
                 el.textContent = '❌ ' + (result.error || '');
