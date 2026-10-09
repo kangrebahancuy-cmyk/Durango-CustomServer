@@ -591,11 +591,11 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
                 return new WebServer.JsonResponse(new JObject { ["error"] = "entries is required" }.ToString(), HttpStatusCode.BadRequest);
             string path = Path.Combine(DataDir ?? Json.DataDir, "whitelist.txt");
             File.WriteAllText(path, # Allowed players (entity ID or character name, one per line)\n + entries);
-            Console.WriteLine("[admin] whitelist.txt ถูกอัปเดตแล้ว");
+            Console.WriteLine("[admin] whitelist.txt updated");
             return new WebServer.JsonResponse(new JObject { ["saved"] = true }.ToString());
         };
 
-        // อ่าน per-island config
+            // Read per-island configuration.
         _webServer.GetRoute["/admin/island/config"] = delegate(HttpListenerRequest request, Dictionary<string, string> _)
         {
             if (!IsAdminAllowed(request)) return Forbidden();
@@ -665,8 +665,8 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             ServerMetrics.TickStats(out double tickP50, out double tickP99, out double tickMax);
             ServerMetrics.WorkStats(out double workP50, out double workP99, out double workMax);
 
-            // แพ็กเก็ตที่ยังไม่มี handler — ตัวนับของจริงอยู่ที่ Connection.UnhandledCounts แล้ว
-            // (GameCode/Durango.Online/Connection.cs:430) เธรดรับ TCP เป็นคนเขียน ⇒ ต้องอ่านใต้ล็อกเดียวกัน
+        // Unhandled packet types are tracked by Connection.UnhandledCounts.
+        // The TCP listener writes these counts, so read them under the same lock.
             JObject unhandled = new();
             lock (Connection.UnhandledCounts)
             {
@@ -686,7 +686,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
                     ["max"] = tickMax,
                     ["samples"] = ServerMetrics.Samples
                 },
-                // เวลาที่ใช้ทำงานจริงต่อรอบ (ไม่รวม sleep) — แยกไว้เพราะ tick_ms รวมเวลานอนไปด้วย
+        // Actual processing time per tick (excluding sleep); tick_ms includes sleeping.
                 ["work_ms"] = new JObject { ["p50"] = workP50, ["p99"] = workP99, ["max"] = workMax },
                 ["players_online"] = _host.PlayersOnline(),
                 ["max_players"] = _host.MaxPlayers,
@@ -700,28 +700,28 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             return new WebServer.JsonResponse(health.ToString());
         };
 
-        // /terrains/* ทั้งหมดจัดการใน UnhandledUrl เพราะชื่อเกาะเป็นตัวแปร (ดู TerrainRoute)
+        // All /terrains/* routes are handled by UnhandledUrl because island IDs are dynamic. See TerrainRoute.
 
         _webServer.UnhandledUrl += UnhandledUrl;
     }
 
     /// <summary>
-    /// [5 ก.ย. 2026] แผนที่ของเกาะ — <c>/terrains/&lt;ชื่อเกาะ&gt;</c> และ chunk ใต้เส้นนั้น
+    /// [Sep 5, 2026] Island terrain map routes: /terrains/&lt;id&gt; and its chunk endpoints.
     ///
-    /// ต้นฉบับจดเส้นทางเป็น "/terrains/1" ตายตัวได้เพราะมีโลกเดียว แต่ตัวเกมประกอบ URL จาก
-    /// <c>Region.TerrainId</c> ที่เซิร์ฟส่งไปกับ Welcome ตรง ๆ โดยไม่ตรวจอะไร
+    /// The original could hardcode "/terrains/1" because it had one world, but the client builds URLs from
+    /// Region.TerrainId sent by the server in Welcome, without additional validation.
     /// (client/Durango.Terrain/TerrainMeta.cs:130 · TerrainBase.cs:337 · MapSystem.cs:752)
-    /// ⇒ พอส่งชื่อเกาะจริงไป เส้นทางก็กลายเป็น /terrains/ri35te/… ตามนั้น
+    /// With real island IDs, routes therefore become /terrains/ri35te/… and so on.
     ///
-    /// ⚠️ ต้องอ่านชื่อเกาะจาก URL ไม่ใช่จาก session token: chunk กับ terrain info ถูกขอแบบ
-    /// **ไม่มี header Authorization** (มีเฉพาะ /whole_biomes) จึงระบุตัวผู้ขอไม่ได้
-    /// ⚠️ และชื่อต้องต่างกันต่อเกาะจริง ๆ เพราะ chunk ขอด้วย disableCache:false
-    /// (TerrainBase.cs:332) ⇒ ถ้าใช้ชื่อซ้ำ เกาะใหม่จะได้แผนที่เกาะเก่าจากแคชของ client
+    /// ⚠️ Read the island ID from the URL, not the session token: chunk and terrain info requests
+    /// do not include an Authorization header (except /whole_biomes), so the requester cannot be identified.
+    /// ⚠️ IDs must be unique per island because chunk requests use disableCache:false.
+    /// (TerrainBase.cs:332); duplicate IDs can make a new island reuse an old island's cached map.
     ///
-    /// รูปแบบ:  /terrains/&lt;id&gt;            → info.yml (TerrainInfoJson)
-    ///          /terrains/&lt;id&gt;/whole_biomes → biome ทั้งแผ่น
-    ///          /terrains/&lt;id&gt;/ocean|rivers/&lt;x&gt;,&lt;y&gt; → chunk เฉพาะชั้น
-    ///          /terrains/&lt;id&gt;/&lt;x&gt;,&lt;y&gt;      → chunk รวม (biome+ocean+river+landmark)
+    /// Routes: /terrains/&lt;id&gt; → info.yml (TerrainInfoJson)
+    ///         /terrains/&lt;id&gt;/whole_biomes → complete biome layer
+    ///         /terrains/&lt;id&gt;/ocean|rivers/&lt;x&gt;,&lt;y&gt; → individual layer chunk
+    ///         /terrains/&lt;id&gt;/&lt;x&gt;,&lt;y&gt; → combined biome/ocean/river/landmark chunk
     /// </summary>
     private WebServer.RouteFunction TerrainRoute(string url)
     {
@@ -772,15 +772,15 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
     }
 
     /// <summary>
-    /// [5 ก.ย. 2026] ด่านกันคนนอกของเส้นทางสำหรับคนดูแล (/health)
+    /// [Sep 5, 2026] Access gate for the administrator health endpoint (/health).
     ///
-    /// เซิร์ฟนี้ bind แบบ wildcard (WebServer.cs:302) ⇒ ทุกเส้นทางเปิดออกอินเทอร์เน็ตหมด
-    /// ตัวเลขใน /health บอกจำนวนคนออนไลน์/สถานะเซิร์ฟ ไม่ควรให้ใครก็อ่านได้
+    /// This server binds to a wildcard address (WebServer.cs:302), exposing routes on all network interfaces.
+    /// /health reveals online counts and server status, so it must not be public by default.
     ///
-    /// ตั้ง token แล้ว → ต้องส่ง ?token=… (หรือหัว X-Admin-Token) มาให้ตรง เรียกจากที่ไหนก็ได้
-    /// ไม่ได้ตั้ง      → ยอมเฉพาะ loopback (curl บนเครื่องเซิร์ฟเอง) เพื่อให้ไล่บั๊กได้โดยไม่เผลอเปิดให้คนนอก
+    /// If a token is configured, require a matching ?token=… or X-Admin-Token header.
+    /// If no token is configured, allow loopback only so local debugging remains possible without exposing it.
     ///
-    /// เทียบแบบใช้เวลาคงที่ ไม่ให้เดา token ทีละตัวอักษรจากเวลาตอบกลับได้
+    /// Compare tokens in constant time to prevent timing-based character-by-character guessing.
     /// </summary>
     private bool IsAdminAllowed(HttpListenerRequest request)
     {
@@ -808,8 +808,8 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
     }
 
     /// <summary>
-    /// GET /players/{entityId} — รูปแบบตรง <c>client/Durango.Player/PlayerInfoJson.cs</c>
-    /// ใช้โชว์ชื่อเจ้าของที่ดิน (님의 사유지) และป็อปอัปข้อมูลผู้เล่น
+    /// GET /players/{entityId} returns the format expected by client/Durango.Player/PlayerInfoJson.cs.
+    /// Used to display land-owner names (private land) and player information popups.
     /// </summary>
     private WebServer.Response GetPublicPlayerInfo(string entityId)
     {
@@ -842,12 +842,12 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[gateway] /players display เขียนไม่ได้: {e.Message}");
+            Console.WriteLine($"[gateway] Could not write /players display: {e.Message}");
         }
         return new WebServer.JsonResponse(body.ToString());
     }
 
-    /// <summary>หา context จาก Authorization header (session token — client ใส่ทุก request แบบ auth)</summary>
+    /// <summary>Find a player context from the Authorization header (session token sent with authenticated client requests).</summary>
     private static WebServer.Response Forbidden() =>
         new WebServer.TextResponse("text/plain", "403 Forbidden", HttpStatusCode.Forbidden);
 
@@ -861,15 +861,15 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
         return _host.FindContextByEntityId(entityId) ?? _gameServer.GetPlayerContext(entityId);
     }
 
-    /// <summary>ต้นฉบับ Gateway.UpdateAppearPlayer — เติมหน้าตาจาก model_info ที่ prologue ส่งมา</summary>
+    /// <summary>Original Gateway.UpdateAppearPlayer; fills appearance data from model_info sent during the prologue.</summary>
     private static void UpdateAppearPlayer(PlayerContext player, Dictionary<string, string> postData)
     {
         bool flag = postData.Get("gender") == "male";
         player.AppearPlayer.EntityType = (ushort)(!flag ? 1001 : 1000);
 
-        // ⚠️ ร่างเปล่า/ชุดชั้นในต้องตามเพศด้วย ไม่งั้นตัวละครหญิงที่ถอดเสื้อจะได้ร่างผู้ชาย
-        // สวมทับโครงตัวหญิง (client/PlayerBehavior.cs:327-329 ใช้ DefaultBody เมื่อช่อง body ว่าง)
-        // ต้นฉบับทำถูกอยู่แล้วที่ client/Durango.Online/PlayerContext.cs:91-93
+        // ⚠️ The naked body and underwear must match the character's gender; otherwise a female character
+        // may receive a male body mesh. The client uses DefaultBody when the body field is empty.
+        // The original implementation handles this correctly in client/Durango.Online/PlayerContext.cs:91-93.
         player.AppearPlayer.Display.DefaultBody = flag
             ? "Models/PC/Male/Body/m_body_nothing.FBX"
             : "Models/PC/Female/Body/f_body_nothing.FBX";
@@ -923,7 +923,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
         return $"http://{host}:{Port}";
     }
 
-    /// <summary>ต้นฉบับ Gateway.cs:46 — iPhonePlayer→ios, Android→android, อื่น ๆ→windows</summary>
+    /// <summary>Original Gateway.cs:46 mapping: iPhonePlayer → ios, Android → android, otherwise windows.</summary>
     private static string PlatformKey(string platform)
     {
         if (platform == null) return "windows";
@@ -934,8 +934,8 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
 
     private WebServer.RouteFunction UnhandledUrl(string url)
     {
-        // ชื่อ/หน้าตาตัวละคร — EstateOwnerWidget กับป็อปอัปอื่นยิง GET /players/<entityId>
-        // (client/PlayerInfoManager.cs RequestFunc) ถ้าไม่มีเส้นนี้ชื่อเจ้าของที่ดินไม่ขึ้น
+        // Character names and appearance are requested by EstateOwnerWidget and other popups through GET /players/&lt;entityId&gt;.
+        // Without this endpoint, land-owner names do not appear. See client/PlayerInfoManager.cs RequestFunc.
         if (url.StartsWith("/players/", StringComparison.OrdinalIgnoreCase))
         {
             string rest = url.Substring("/players/".Length);
@@ -955,13 +955,13 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             }
         }
 
-        // ══ Admin Web UI — เสิร์ฟไฟล์จาก server/admin/ ═══════════════════════════════════════════
+        // ══ Admin Web UI — serves files from server/admin/ ═══════════════════════════════════════════
         // /admin/ → index.html, /admin/style.css → CSS, /admin/app.js → JS
-        // ต้องเปิด admin token ถึงจะเข้าได้ (กันคนนอกเห็นหน้าจัดการเซิร์ฟ)
+        // The admin token must be configured to access this UI, preventing public access to server controls.
         if (url.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
         {
             string adminDir = Path.Combine(AppContext.BaseDirectory, "admin");
-            // ถ้าไม่มีโฟลเดอร์ admin ข้าง executable ให้ลองหาใน DataDir
+        // If the admin folder is not beside the executable, try DataDir.
             if (!Directory.Exists(adminDir))
             {
                 adminDir = Path.Combine(DataDir ?? Json.DataDir, "..", "admin");
@@ -981,7 +981,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             }
             else
             {
-                // เสิร์ฟไฟล์ static ใน admin/ (style.css, app.js, login.html, etc.)
+        // Serve static files from admin/ (style.css, app.js, login.html, etc.).
                 string fileName = adminFile.Substring("/admin/".Length);
                 if (fileName.Contains("..") || Path.IsPathRooted(fileName))
                     return (HttpListenerRequest _, Dictionary<string, string> __) => new WebServer.BadRequestResponse();
@@ -1030,7 +1030,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             {
                 relative = relative.Substring(0, qIdx);
             }
-            // Prevent path traversal. — client ขอแค่ <โฟลเดอร์>/<ชื่อ> ธรรมดา ไม่มี .. และไม่ใช่ path เต็ม
+        // Prevent path traversal. The client should request only <folder>/<name>, never .. or an absolute path.
             if (relative.Length == 0 || relative.Contains("..") || Path.IsPathRooted(relative))
             {
                 return (HttpListenerRequest _, Dictionary<string, string> __) => new WebServer.BadRequestResponse();
@@ -1097,7 +1097,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
                 {
                     return new WebServer.FileResponse(resolvedA);
                 }
-                // Voice-over soundbanks are language-specific; the Android bundle only has en_us, so serve it for all languages.
+        // Voice-over soundbanks are language-specific; the Android bundle only contains en_us, so serve it for every language.
                 string fallbackA = ResolveVoiceBankFallback(aName, AssetBundleAndroidDir);
                 if (fallbackA != null)
                 {
@@ -1115,8 +1115,8 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
         }
 
         // [Removed Sep 5, 2026] A duplicate /assetbundles/android/ block used to exist here.
-        // It was unreachable because the first matching condition handled the same URL, so it was removed.
-        // Keep the behavior in one place to avoid inconsistent fixes.
+        // It was unreachable because the earlier condition always matched the same URL, so it was removed.
+        // Keep this behavior in one place to avoid fixing one copy and forgetting the other.
         return (HttpListenerRequest request, Dictionary<string, string> _) => new WebServer.BadRequestResponse();
     }
 
@@ -1139,7 +1139,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
         }
     }
 
-    /// <summary>Voice-over soundbanks: soundbanks$android/// <summary>เสียงพากย์: soundbanks$android$<lang>$voice_*.bnk — เซิร์ฟมีแค่ en_us</summary>lt;lang&gt;$voice_*.bnk; only en_us is available on the server.</summary>
+    /// <summary>Voice-over soundbanks: soundbanks$android$&lt;lang&gt;$voice_*.bnk; only en_us is available on the server.</summary>
     private static string ResolveVoiceBankFallback(string requestedName, string dir)
     {
         const string marker = "$android$";
