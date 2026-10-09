@@ -1,11 +1,8 @@
 @echo off
 REM ==========================================================
 REM  Durango - server launcher (double-click me)
-REM  All Thai text lives in tools\start-server.ps1, not here:
-REM  cmd.exe reads .bat as codepage 874/ANSI, so Thai text
-REM  inside a UTF-8 .bat comes out as garbage.
+REM  Keep user-facing menu text in tools\start-server.ps1, not in this batch file.
 REM ==========================================================
-chcp 874 >nul 2>&1
 title Durango - server launcher
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\start-server.ps1"

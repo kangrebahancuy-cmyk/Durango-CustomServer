@@ -183,7 +183,7 @@ public class World
                 out AddOns? addons);
             if (!made.HasValue)
             {
-                Console.WriteLine($"[world] ⚠️ ไม่รู้จัก blueprint {type} — ข้าม {id}");
+                Console.WriteLine($"[world] ⚠️ Unknown blueprint {type}; skipping {id}");
                 continue;
             }
 
@@ -205,9 +205,9 @@ public class World
         if (placed > 0)
         {
             Save();
-            Console.WriteLine($"[world] วางจุดสำคัญของเกาะ {placed} จุด " +
-                              $"(ท่าเรือ {pois.PortPoints.Count} · รูวาร์ป {pois.Warpholes.Count} · " +
-                              $"รอยแยก {pois.Rifts.Count} · หลุมอุกกาบาต {pois.Craters.Count})");
+            Console.WriteLine($"[world] Placed {placed} island points of interest " +
+                              $"(ports {pois.PortPoints.Count} · warp holes {pois.Warpholes.Count} · " +
+                              $"rifts {pois.Rifts.Count} · craters {pois.Craters.Count})");
         }
     }
 
@@ -243,7 +243,7 @@ public class World
         if (stale.Count == 0) return;
 
         foreach (string id in stale) ArtifactManager.RemoveArtifact(id);
-        Console.WriteLine($"[world] ลบจุดสำคัญค้างที่ไม่ตรงกับไฟล์เกาะแล้ว {stale.Count} จุด: " +
+        Console.WriteLine($"[world] Removed {stale.Count} stale island POIs not present in the island file: " +
                           string.Join(", ", stale));
     }
 
@@ -408,7 +408,7 @@ public class World
         {
             player.ForgetAnimal(animal.EntityId);
         }
-        Console.WriteLine($"[สัตว์] ซาก {animal.EntityId} หายไปแล้ว — เกิดใหม่ที่ " +
+        Console.WriteLine($"[animal] Corpse {animal.EntityId} despawned; respawned at " +
                           $"[{animal.HomeTile.x},{animal.HomeTile.y}]");
     }
 
@@ -626,8 +626,8 @@ public class World
             if (now < entry.DueAt) continue;
             queue.RemoveAt(i);
             var tile = new Point2(entry.X, entry.Y);
-            AddNatural(tile, entry.EntityType);   // broadcast GardenDiff ให้เอง + Save()
-            Console.WriteLine($"[นิเวศ] ของธรรมชาติชนิด {entry.EntityType} งอกกลับที่ ({entry.X},{entry.Y})");
+            AddNatural(tile, entry.EntityType);   // Broadcasts GardenDiff and saves automatically.
+            Console.WriteLine($"[ecology] Natural object type {entry.EntityType} regrew at ({entry.X},{entry.Y})");
         }
     }
 
@@ -818,7 +818,7 @@ public class World
         // (client/Durango.Environment/WeatherManager.cs:148-150) — กันไว้ที่ต้นทางดีกว่า
         if (!WeatherTuning.IsKnown(weather))
         {
-            Console.WriteLine($"[อากาศ] ⚠️ ไม่รู้จักสภาพอากาศ '{weather}' — ไม่เปลี่ยน");
+            Console.WriteLine($"[weather] ⚠️ Unknown weather '{weather}'; no change");
             return;
         }
         Weather = weather;
@@ -828,7 +828,7 @@ public class World
         {
             player.SyncWeatherStatusEffects(weather);
         }
-        Console.WriteLine($"[อากาศ] {TerrainId} → {weather}");
+        Console.WriteLine($"[weather] {TerrainId} → {weather}");
     }
 
     public List<Pet> GetGrazedPets() => _context.GrazedPetList;

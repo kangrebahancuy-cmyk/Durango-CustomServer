@@ -67,7 +67,7 @@ public partial class Player
         // กันล้น long ตอนมีบั๊กแจกเงินซ้ำ — ค่าเพดานเดียวกับที่ฝั่งเกมยอมรับใน NumberInputPopup
         // (client/Durango.UI/ClanInfoPage.cs:380 ใส่เพดาน 99,999,999 ตอนบริจาคเข้ากองทุนเผ่า)
         _context.TStone = Math.Min(_context.TStone + amount, MaxTStone);
-        Console.WriteLine($"[เงิน] {ShortEntityId()} +{amount:N0} T Stone → {_context.TStone:N0} (จาก {reason})");
+        Console.WriteLine($"[wallet] {ShortEntityId()} +{amount:N0} T Stone → {_context.TStone:N0} (reason: {reason})");
         PushWallet();
     }
 
@@ -83,7 +83,7 @@ public partial class Player
         if (amount <= 0) return true;               // ของฟรี — ถือว่าจ่ายผ่าน
         if (_context.TStone < amount) return false; // เงินไม่พอ — ห้ามหักบางส่วน
         _context.TStone -= amount;
-        Console.WriteLine($"[เงิน] {ShortEntityId()} -{amount:N0} T Stone → {_context.TStone:N0} (จ่าย {reason})");
+        Console.WriteLine($"[wallet] {ShortEntityId()} -{amount:N0} T Stone → {_context.TStone:N0} (spent for: {reason})");
         PushWallet();
         return true;
     }

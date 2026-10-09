@@ -91,6 +91,42 @@
     '✓ Reload successful':'✓ Berhasil dimuat ulang',
     'Spawn (Animals)':'Spawn (Hewan)',
     'Starter (Starting Items)':'Starter (Item Awal)',
+    'Durango LastHuman — Admin Tool':'Durango LastHuman — Alat Admin',
+    'LastHuman Admin':'Admin LastHuman',
+    'Server URL':'URL Server',
+    'Admin Token':'Token Admin',
+    'Switch language':'Ganti bahasa',
+    'Whitelist':'Daftar izin',
+    'Ban List':'Daftar blokir',
+    'Item Prototypes':'Prototipe Item',
+    'Crafting Recipes':'Resep Crafting',
+    'Animals':'Hewan',
+    'Natural Resources':'Sumber Daya Alam',
+    'Buildings/Artifacts':'Bangunan/Artefak',
+    'Skills':'Skill',
+    'Skill Categories':'Kategori Skill',
+    'Jobs':'Profesi',
+    'Constants':'Konstanta',
+    'Tags':'Tag',
+    'Reload Now':'Muat Ulang Sekarang',
+    'Config saved':'Konfigurasi disimpan',
+    'Save failed':'Gagal menyimpan',
+    'Refresh failed':'Gagal menyegarkan',
+    'Current server configuration':'Konfigurasi server saat ini',
+    'Whitelist updated':'Daftar izin diperbarui',
+    'Ban List updated':'Daftar blokir diperbarui',
+    'No entries':'Tidak ada entri',
+    'Kick player':'Keluarkan pemain',
+    'Ban player':'Blokir pemain',
+    'Maintenance Mode':'Mode Maintenance',
+    'Announcement':'Pengumuman',
+    'Player name':'Nama pemain',
+    'Entity ID':'ID Entitas',
+    'Level':'Level',
+    'Region':'Wilayah',
+    'Actions':'Aksi',
+    'Game Data Browser':'Penjelajah Data Game',
+    'Select data':'Pilih data'
     'Balance range':'Rentang saldo',
     'Characters':'Karakter',
     'Kick':'Keluarkan',
@@ -133,7 +169,8 @@
       const value = originalText.get(node), trimmed = value.trim();
       if (!trimmed) return;
       const result = translate(trimmed);
-      node.nodeValue = result === trimmed ? value : value.replace(trimmed, result);
+      const target = result === trimmed ? value : value.replace(trimmed, result);
+      if (node.nodeValue !== target) node.nodeValue = target;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       for (const attr of ['placeholder', 'title', 'aria-label']) {
         if (node.hasAttribute(attr)) {

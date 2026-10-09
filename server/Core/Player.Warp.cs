@@ -119,26 +119,26 @@ public partial class Player
     {
         if (!MayTouchArtifact(msg.EntityId, "ตั้งเป็นจุดกลับ"))
         {
-            Send(new Abort { Text = "ตั้งจุดกลับที่นี่ไม่ได้" }, seq);
+            Send(new Abort { Text = "Cannot set a return point here" }, seq);
             return;
         }
         if (_world.ArtifactManager.Get(msg.EntityId) is not { } artifact)
         {
-            Send(new Abort { Text = "ไม่พบสิ่งปลูกสร้างนี้" }, seq);
+            Send(new Abort { Text = "Structure not found" }, seq);
             return;
         }
 
         MergedBlueprint blueprint = BlueprintStore.GetBlueprint(artifact.EntityType);
         if (blueprint?.Components == null || !blueprint.Components.Contains("Home"))
         {
-            Send(new Abort { Text = "ตั้งจุดกลับได้เฉพาะที่นอนเท่านั้น" }, seq);
+            Send(new Abort { Text = "Return points can only be set at beds" }, seq);
             return;
         }
 
         _context.HomeArtifactId = msg.EntityId;
         OnContextChanged();
 
-        Console.WriteLine($"[วาร์ป] {Short(EntityId)} ตั้ง {blueprint.Id} " +
+        Console.WriteLine($"[warp] {Short(EntityId)} set return point {blueprint.Id} " +
                           $"ที่ [{artifact.Tile.x},{artifact.Tile.y}] เป็นจุดกลับ");
 
         // ฝั่งเกมรอ .On<OK> ตัวเดียว แล้วเด้งข้อความยืนยันเอง
@@ -153,7 +153,7 @@ public partial class Player
         // ตั้งจุดกลับนอกเกาะแล้ววาร์ปกลับไปจะหลุดออกนอกโลก
         if (!IsTileInsideWorld(msg.Tile))
         {
-            Send(new Abort { Text = "จุดกลับอยู่นอกเกาะ" }, seq);
+            Send(new Abort { Text = "Return point is outside the island" }, seq);
             return;
         }
         _context.ReturningX = msg.Tile.x;
@@ -193,7 +193,7 @@ public partial class Player
         List<Point2> ports = pois?.PortPoints;
         if (ports == null || ports.Count == 0)
         {
-            Send(new Abort { Text = "เกาะนี้ไม่มีท่าเรือ" }, seq);
+            Send(new Abort { Text = "This island has no port" }, seq);
             return;
         }
         BeginWarp(NearestTo(ports), seq, "ไปท่าเรือ");
@@ -218,7 +218,7 @@ public partial class Player
                 return true;
             }
             // บ้านหายไปแล้ว (ถูกรื้อ / อยู่คนละเกาะ) — ล้างทิ้งเพื่อไม่ให้ค้างพาไปผิดที่ทุกครั้ง
-            Console.WriteLine($"[วาร์ป] {Short(EntityId)} บ้าน {_context.HomeArtifactId} ไม่อยู่บนเกาะนี้แล้ว — ล้างค่า");
+            Console.WriteLine($"[warp] {Short(EntityId)} home artifact {_context.HomeArtifactId} is no longer on this island; clearing it");
             _context.HomeArtifactId = null;
             OnContextChanged();
             SendPoints();
@@ -274,7 +274,7 @@ public partial class Player
         // [7 ก.ย. 2026] ตายแล้ววาร์ปไม่ได้ — เดิมกดจากหน้าจอตายแล้วย้ายตัวได้จริง
         if (!_context.AppearPlayer.IsAlive)
         {
-            Send(new Abort { Text = "ตอนนี้วาร์ปไม่ได้" }, seq);
+            Send(new Abort { Text = "Warping is not available right now" }, seq);
             return;
         }
         // เพดานจำนวนคิววาร์ปที่ค้างพร้อมกัน — **ค่าของเรา** กันยิงรัวจนจอง timer ไม่จำกัด
@@ -282,7 +282,7 @@ public partial class Player
         {
             if (_warpTimers.Count >= MaxConcurrentWarps)
             {
-                Send(new Abort { Text = "กำลังวาร์ปอยู่แล้ว" }, seq);
+                Send(new Abort { Text = "A warp is already in progress" }, seq);
                 return;
             }
         }
@@ -290,7 +290,7 @@ public partial class Player
         float duration = Math.Max(0f, WarpTuning.WarpTime);
         Send(new Messages.Timer { Duration = duration }, seq);
 
-        Console.WriteLine($"[วาร์ป] {Short(EntityId)} {what} → [{tile.x},{tile.y}] (รอ {duration:0.#} วิ)");
+        Console.WriteLine($"[warp] {Short(EntityId)} {what} → [{tile.x},{tile.y}] (waiting {duration:0.#} sec)");
 
         if (duration <= 0f)
         {
@@ -307,7 +307,7 @@ public partial class Player
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[วาร์ป] ย้ายตัวไม่สำเร็จ: {e.Message}");
+                Console.WriteLine($"[warp] Character transfer failed: {e.Message}");
             }
             finally
             {

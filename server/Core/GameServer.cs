@@ -10,11 +10,11 @@ using Shared.Region;
 
 namespace Durango.Online;
 
-// พอร์ตจาก nexonSRC/Durango.Online/GameServer.cs (TCP 8191, handshake แท้ GetClock→Auth→Ready)
-// ความต่างจากต้นฉบับ (เอกสารใน docs/server/ServerNx.md):
-//  1) เซิร์ฟนี้รับหลายผู้เล่นในโลกเดียว — ต้นฉบับ offline โฮสต์ 1 คน/สล็อต จึงเซฟเฉพาะ _playerCtx
-//     ที่นี่ ContextChanged เซฟ context ของคนนั้นถ้ามี Path (สล็อตจริงบนดิสก์)
-//  2) IssueSession: token→entityId สำหรับ /sessions (ต้นฉบับไม่มี session token จริง)
+// Ported from nexonSRC/Durango.Online/GameServer.cs: TCP 8191 with the original GetClock → Auth → Ready handshake.
+// Differences from the original are documented in docs/server/ServerNx.md.
+// This server supports multiple players in one world; the original offline host used one player per slot and saved only _playerCtx.
+// ContextChanged now saves the changed context when it has a persistent on-disk Path.
+// IssueSession maps a session token to an entity ID for /sessions; the original did not use real session tokens.
 public class GameServer
 {
     public const int DefaultPort = 8191;
@@ -32,23 +32,23 @@ public class GameServer
     private readonly Dictionary<string, string> _sessionTokens = new();
 
     /// <summary>
-    /// token → กุญแจบัญชีของผู้ถือ — ตัวที่ทำให้ "ย้าย token ไปชี้ตัวละครไหนก็ได้" หมดไป
+/// Maps each session token to its account owner's key, preventing the token from being redirected to arbitrary characters.
     ///
-    /// ⚠️ ไม่มีตารางนี้ = <c>BindSessionToEntity</c> เช็คได้แค่ว่า "token นี้เซิร์ฟออกให้จริงไหม"
-    /// ไม่ได้เช็คว่าตัวละครปลายทางเป็นของผู้ถือ token หรือเปล่า ⇒ curl 2 บรรทัดยึดตัวละครใครก็ได้:
-    /// <c>POST /sessions</c> (ขอ token ฟรี) → <c>GET /entry?entity_id=&lt;ของเหยื่อ&gt;</c> → Auth ผ่านเป็นเหยื่อ
+/// ⚠️ Without this table, BindSessionToEntity only verifies that the server issued the token.
+/// It would not verify that the target character belongs to the token holder, allowing account takeover with a short curl sequence.
+/// Example attack: POST /sessions to get a token, then GET /entry?entity_id=&lt;victim&gt; to authenticate as the victim.
     /// </summary>
     private readonly Dictionary<string, string> _sessionOwners = new();
 
     public World World { get; }
 
     /// <summary>
-    /// [5 ก.ย. 2026] โลกของทุกเกาะ — Host ตั้งให้หลังสร้าง GameServer
-    /// ผู้เล่นแต่ละคนเข้าโลกตาม PlayerContext.RegionId ไม่ใช่โลกเดียวร่วมกันแบบต้นฉบับ
+/// [Sep 5, 2026] Worlds for every island; Host sets this after GameServer is created.
+/// Each player enters the world identified by PlayerContext.RegionId rather than sharing one world as in the original.
     /// </summary>
     public WorldRegistry Worlds { get; set; }
 
-    /// <summary>โลกที่ผู้เล่นคนนี้อยู่ — ตกไปที่โลกตั้งต้นถ้ายังไม่มีระบบหลายเกาะ</summary>
+/// <summary>World containing this player; falls back to the starting world when multi-island support is unavailable.</summary>
     public World WorldOf(PlayerContext context) =>
         Worlds == null ? World : Worlds.GetOrCreate(context?.RegionId);
 
@@ -98,10 +98,10 @@ public class GameServer
     }
 
     /// <summary>
-    /// ตัดสายที่ต่อเข้ามาแล้วไม่ยอมผ่าน Auth ภายในเวลาที่กำหนด
+/// Disconnect connections that do not complete Auth within the configured timeout.
     ///
-    /// ⚠️ ไม่มีตัวนี้ = เปิด TCP ค้างไว้เฉย ๆ ก็จองบัฟเฟอร์ ~4 MB ต่อเส้นได้ตลอดกาล
-    /// โดยไม่ต้องมี token ไม่ต้องมีบัญชี ไม่ต้องทำอะไรเลย
+/// ⚠️ Without this timeout, a TCP connection could reserve about 4 MB of buffers indefinitely.
+/// No token or account is required to hold that connection open.
     /// </summary>
     private void DropStaleUnauthenticated()
     {
@@ -118,14 +118,14 @@ public class GameServer
 
         foreach (Connection connection in stale)
         {
-            Console.WriteLine("[auth] ตัดสายที่ไม่ผ่าน Auth ภายในเวลาที่กำหนด");
+            Console.WriteLine("[auth] Disconnected a connection that did not authenticate before timeout");
             _pendingAuth.Remove(connection);
             try { connection.Close(); } catch (Exception) { }
             _connections.Remove(connection);
         }
     }
 
-    /// <summary>ลงทะเบียน context (สล็อตจริงหรือชั่วคราว) — /sessions เรียก</summary>
+/// <summary>Register a context, either persistent or temporary; called by /sessions.</summary>
     public bool Register(PlayerContext context)
     {
         if (context != null && !string.IsNullOrEmpty(context.EntityId))
@@ -136,14 +136,14 @@ public class GameServer
         return false;
     }
 
-    /// <summary>ออก session token ให้ผู้ถือกุญแจบัญชี <paramref name="ownerKey"/></summary>
+/// <summary>Issue a session token to the holder of account key <paramref name="ownerKey"/>.</summary>
     public void IssueSession(string entityId, string token, string ownerKey)
     {
         _sessionTokens[token] = entityId;
         _sessionOwners[token] = ownerKey;
     }
 
-    /// <summary>กุญแจบัญชีของผู้ถือ token นี้ — null ถ้าไม่รู้จัก token</summary>
+/// <summary>Account key associated with a token, or null if the token is unknown.</summary>
     public string OwnerOfSession(string token) => _sessionOwners.Get(token ?? "");
 
     public bool TryGetSessionEntityId(string token, out string entityId)
@@ -152,16 +152,16 @@ public class GameServer
     }
 
     /// <summary>
-    /// [5 ก.ย. 2026] ย้าย session token ที่ออกไว้แล้ว ให้ชี้ตัวละครที่ผู้เล่นเลือกบนหน้า Title
+/// [Sep 5, 2026] Rebind an existing session token to the character selected on the title screen.
     ///
-    /// ทำไมต้องมี: ในโหมด Online ตัวเกม **ไม่ส่ง** ฟิลด์ "player" มากับ /sessions
-    /// (client/Durango.UI/TitleMenuGroup.cs:334-340 ใส่ "player" เฉพาะตอน GameManager.ConnectCluster != null
-    /// คือทาง LAN/ConnectTo เท่านั้น) ⇒ ตอนออก token เซิร์ฟยังไม่รู้ว่าจะเล่นตัวไหน
-    /// ตัวละครที่เลือกถูกบอกทีหลังที่ /entry?entity_id=… ซึ่งยิงมาแบบ auth:true
-    /// (client/Durango.UI/TitleMenuGroup.cs:1046 RquestEntry → Http.cs:36 ใส่ header Authorization)
-    /// ⇒ ผูกที่นี่ได้อย่างปลอดภัย เพราะต้องถือ token ที่เซิร์ฟออกให้เท่านั้นถึงจะย้ายได้
+/// In Online mode, the client does not include the player field in /sessions.
+/// The client sends that field only for LAN/ConnectTo when GameManager.ConnectCluster is not null (TitleMenuGroup.cs:334-340).
+/// Therefore, the server does not know the selected character when it issues the token.
+/// The selected character is provided later through /entry?entity_id=… with auth:true.
+/// TitleMenuGroup.cs:1046 calls RquestEntry and Http.cs:36 adds the Authorization header.
+/// Rebinding is safe because only the holder of a server-issued token can perform it.
     ///
-    /// คืน false เมื่อ token ไม่รู้จัก — ผู้เรียกไม่ต้องทำอะไรต่อ (Auth จะปฏิเสธเองอยู่แล้ว)
+/// Returns false for an unknown token; Auth will reject the connection.
     /// </summary>
     public bool BindSessionToEntity(string token, string entityId)
     {
@@ -171,20 +171,20 @@ public class GameServer
             return false;
         }
 
-        // ⚠️ ด่านที่ขาดไปตั้งแต่ต้น — เดิมเช็คแค่ว่า token นี้เซิร์ฟออกให้จริงไหม แล้วย้ายให้เลย
-        // ซึ่งไม่ได้กันอะไรเลย เพราะ token ขอฟรีได้ที่ /sessions โดยไม่ต้องยืนยันตัวตน
-        // ⇒ ต้องเช็คว่า "ตัวละครปลายทางเป็นของบัญชีเดียวกับผู้ถือ token" ด้วย
+// ⚠️ Previously, the server only checked whether a token was server-issued before rebinding it.
+// This was insufficient because anyone could request a token at /sessions without authenticating.
+// The server must also verify that the target character belongs to the account holding the token.
         string owner = _sessionOwners.Get(token);
         PlayerContext target = _playerContexts.Get(entityId);
 
-        // ตัวละครที่เซิร์ฟยังไม่รู้จัก = ตัวที่เพิ่งขอ session มาในรอบนี้ (ยังไม่ผ่าน /players)
-        // ปล่อยผ่านได้เพราะยังไม่มีใครเป็นเจ้าของ และ /players จะประทับเจ้าของให้ตอนสร้างจริง
+// A character unknown to the server is newly requested for this session and has not passed through /players yet.
+// It may proceed because it has no owner; /players assigns ownership when creation is persisted.
         if (target == null) { _sessionTokens[token] = entityId; return true; }
 
         if (!AccountKeys.Same(owner, target.OwnerKey))
         {
-            Console.WriteLine($"[auth] ปฏิเสธการผูก session: บัญชี {AccountKeys.ForLog(owner)} " +
-                              $"ไม่ใช่เจ้าของตัวละคร {entityId} (เจ้าของ {AccountKeys.ForLog(target.OwnerKey)})");
+            Console.WriteLine($"[auth] Rejected session binding: account {AccountKeys.ForLog(owner)} " +
+                $"does not own character {entityId} (owner {AccountKeys.ForLog(target.OwnerKey)})");
             return false;
         }
         _sessionTokens[token] = entityId;
@@ -192,45 +192,45 @@ public class GameServer
     }
 
     /// <summary>
-    /// context ของตัวละครนี้ — <c>null</c> ถ้าเซิร์ฟไม่รู้จัก
+/// Context for this character; null if the server does not know it.
     ///
-    /// ⚠️ เดิมถอยไปที่ <c>_playerCtx</c> (สล็อตแรกของเซิร์ฟ) เมื่อหาไม่เจอ
-    /// ซึ่งเป็นมรดกจากเซิร์ฟ offline ที่มีผู้เล่นคนเดียว แต่ในโหมดหลายคนมันคือช่องโหว่:
-    /// ใส่ <c>entity_id</c> มั่ว ๆ ที่ไม่มีจริง = **ได้ตัวละครของคนแรกไปเล่น** โดยไม่ต้องรู้ id ใครเลย
-    /// แล้ว autosave เขียนความเสียหายลงไฟล์จริงภายใน 60 วินาที
-    /// ⇒ คืน null แล้วให้ผู้เรียกปฏิเสธการเชื่อมต่อ
+/// ⚠️ Previously, an unknown character fell back to _playerCtx, the server's first slot.
+/// That behavior came from the single-player offline server and is unsafe in multiplayer.
+/// Supplying an arbitrary entity_id could grant access to the first player's character.
+/// Autosave could then persist the damage within 60 seconds.
+/// Return null instead and let the caller reject the connection.
     /// </summary>
     [CanBeNull]
     public PlayerContext GetPlayerContext(string entityId) => _playerContexts.Get(entityId);
 
     /// <summary>
-    /// เพดานจำนวนสายที่เปิดค้างพร้อมกัน — **ค่าของเรา**
+/// Maximum number of simultaneous open connections; configured by this server.
     ///
-    /// ⚠️ <c>--max-players</c> กันได้แค่ประตูหน้า (HTTP /entry) แต่ทางเข้าจริงคือ TCP
-    /// ซึ่งเดิม**ไม่มีเพดานเลย** ⇒ เปิดสาย TCP ค้างไว้เฉย ๆ โดยไม่ต้อง Auth ก็จองบัฟเฟอร์
-    /// ~4 MB ต่อเส้นได้ไม่จำกัด (Connection.cs จอง 7 ก้อน ก้อนละ 512 KB ตั้งแต่ตอน accept)
-    /// ⇒ ไม่กี่ร้อยสายก็ทำ RAM หมด
+/// ⚠️ --max-players limits only the HTTP /entry gate; the actual game connection uses TCP.
+/// TCP connections previously had no limit, allowing unauthenticated connections to reserve buffers.
+/// Each connection reserves about 4 MB: seven 512 KB buffers in Connection.cs when accepted.
+/// A few hundred connections could exhaust server RAM.
     ///
-    /// ตั้งเป็น 3 เท่าของเพดานผู้เล่น เผื่อช่วงที่คนกำลังต่อใหม่ทับกับคนเก่าที่ยังไม่หลุด
+/// Set the limit to three times the player cap to allow reconnects while old connections are closing.
     /// </summary>
     public static int MaxPlayersHint { get; set; } = 200;
 
     private static int MaxConnections => Math.Max(32, MaxPlayersHint * 3);
 
     /// <summary>
-    /// เวลาที่ยอมให้สายหนึ่งค้างอยู่โดยยังไม่ผ่าน Auth (วินาที) — **ค่าของเรา**
-    /// ตัวเกมจริงส่ง Auth ทันทีหลังต่อ ⇒ 30 วินาทีเหลือเฟือแม้เน็ตแย่
+/// Maximum time a connection may remain unauthenticated, in seconds.
+/// The official client sends Auth immediately, so 30 seconds allows for poor network conditions.
     /// </summary>
     private const double UnauthenticatedTimeoutSeconds = 30.0;
 
-    /// <summary>สายที่ยังไม่ผ่าน Auth → เวลาที่ต่อเข้ามา (ใช้ตัดสายที่จองบัฟเฟอร์ทิ้งไว้เฉย ๆ)</summary>
+/// <summary>Unauthenticated connection timestamp, used to release buffers reserved by idle connections.</summary>
     private readonly Dictionary<Connection, double> _pendingAuth = new();
 
     private void Listener_ClientAccepted(Socket socket)
     {
         if (_connections.Count >= MaxConnections)
         {
-            Console.WriteLine($"[auth] ปฏิเสธสายใหม่ — เต็มเพดาน ({_connections.Count}/{MaxConnections})");
+            Console.WriteLine($"[auth] Rejected new connection: connection cap reached ({_connections.Count}/{MaxConnections})");
             try { socket.Close(); } catch (Exception) { }
             return;
         }
@@ -245,13 +245,13 @@ public class GameServer
         });
         connection.Recv(delegate(Auth auth, PacketHeader header)
         {
-            // [4 ก.ย. 2026] ก่อนหน้านี้เชื่อ auth.EntityId ตรง ๆ — ใครก็ยิง Auth อ้างเป็น entity id ใครก็ได้
-            // สวมรอยตัวละครคนอื่นได้ทันที ⇒ ต้องผูกกับ token ที่ /sessions ออกให้เท่านั้น (เหมือน server/ หลัก)
+// [Sep 4, 2026] Previously, auth.EntityId was trusted directly, allowing clients to authenticate as any entity.
+// Authentication is now bound to the token issued by /sessions.
             if (!TryGetSessionEntityId(auth.SessionToken, out string sessionEntityId)
                 || !string.Equals(sessionEntityId, auth.EntityId, StringComparison.Ordinal))
             {
-                Console.WriteLine($"[auth] ปฏิเสธ: token ไม่ตรงกับ entity ที่อ้าง ({auth.EntityId})");
-                connection.Send(new Abort { Text = "การยืนยันตัวตนไม่ผ่าน" }, header.Seq);
+            Console.WriteLine($"[auth] Rejected: token does not match claimed entity ({auth.EntityId})");
+            connection.Send(new Abort { Text = "Authentication failed" }, header.Seq);
                 connection.Close();
                 return;
             }
@@ -259,14 +259,14 @@ public class GameServer
             PlayerContext playerContext = GetPlayerContext(entityId);
             if (playerContext == null)
             {
-                // เดิมตรงนี้ถอยไปใช้ตัวละครสล็อตแรกให้เลย (ดู GetPlayerContext) ⇒ ใส่ id มั่วก็เข้าเล่นได้
-                Console.WriteLine($"[auth] ปฏิเสธ: ไม่รู้จักตัวละคร {entityId}");
-                connection.Send(new Abort { Text = "ไม่พบตัวละครนี้" }, header.Seq);
+// Unknown IDs previously fell back to the first character slot (see GetPlayerContext), allowing arbitrary IDs to connect.
+            Console.WriteLine($"[auth] Rejected: unknown character {entityId}");
+            connection.Send(new Abort { Text = "Character not found" }, header.Seq);
                 connection.Close();
                 return;
             }
             _connectionDict[connection] = entityId;
-            _pendingAuth.Remove(connection);      // ผ่านด่านแล้ว ไม่ต้องนับเวลาอีก
+            _pendingAuth.Remove(connection);      // Auth succeeded; timeout tracking is no longer needed.
             SendWelcome(connection, entityId, playerContext.PlayerInfo.PlayerName, header.Seq);
         });
         connection.Recv(delegate(Ready ready, PacketHeader readyHeader)
@@ -281,9 +281,9 @@ public class GameServer
                 PlayerContext playerContext = GetPlayerContext(text);
                 if (playerContext == null)
                 {
-                    // ปกติไม่ควรเกิด (Auth กรองไปแล้ว) — กันไว้เพราะเดิมจุดนี้ NullReference ไม่ได้
-                    // เพราะมี fallback อยู่ ตอนตัด fallback ออกจึงต้องมีด่านตรงนี้ด้วย
-                    Console.WriteLine($"[auth] Ready: ไม่รู้จักตัวละคร {text} — ตัดสาย");
+// This should not occur because Auth already filters the request, but retain a guard against null references.
+// The old fallback masked this case, so it must be checked explicitly now.
+            Console.WriteLine($"[auth] Ready: unknown character {text}; disconnecting");
                     connection.Close();
                     return;
                 }
@@ -295,8 +295,8 @@ public class GameServer
                 {
                     player.ContextChanged += delegate
                     {
-                        // ต้นฉบับเซฟเฉพาะ _playerCtx (offline โฮสต์คนเดียว) — ที่นี่เซฟ context ของสล็อตนั้น
-                        // ถ้าเป็นสล็อตจริงบนดิสก์ (context ชั่วคราวที่ยังไม่ผ่าน /players ไม่มี Path จึงไม่เซฟ)
+// The original saved only _playerCtx for its single-player offline host; this server saves the context for each slot.
+// Temporary contexts without a Path are not saved until /players promotes them to persistent slots.
                         if (!string.IsNullOrEmpty(playerContext.Path))
                         {
                             playerContext.Save();
@@ -328,15 +328,15 @@ public class GameServer
         };
         PlayerContext playerContext = GetPlayerContext(entityId);
         msg.Storage.Data = playerContext.Storage;
-        // [5 ก.ย. 2026] บอกเกาะที่ผู้เล่นอยู่จริง — ต้นฉบับ hardcode "1" ได้เพราะมีโลกเดียว
-        // Id ใช้ระบุเกาะในระบบล่องเรือ (ตรงกับ RegionCatalog) ส่วน TerrainId ยังเป็น "1" เพราะ
-        // ตัวเกมเอาค่านี้ไปประกอบ URL ขอแผนที่ /terrains/<TerrainId>/… ซึ่ง Gateway เสิร์ฟที่เส้น
-        // "/terrains/1" ให้ตามโลกของผู้เล่นที่ขออยู่แล้ว ⇒ ไม่ต้องแตะฝั่ง client
+            // [Sep 5, 2026] Report the player’s actual island; the original hardcoded 1 because it had only one world.
+            // Id identifies the island in RegionCatalog; TerrainId remains 1 because
+            // the client uses it to build /terrains/&lt;TerrainId&gt;/… URLs and Gateway serves the route for the requesting player.
+            // This avoids requiring a client-side change.
         World playerWorld = WorldOf(playerContext);
         msg.Region.CreatedAt = 0.0;
-        // Region.Id/Role ต้องบอก client ว่าตอนนี้อยู่เกาะส่วนตัวหรือไม่
-        // UI ที่ดินเทียบ GameManager.Region.Role/Id กับ PersonalRegion.Region.Id
-        // เควส MoveToRegionToDo(Personal) ก็เช็ค Role() == Personal
+            // Region.Id and Role tell the client whether the player is on a personal island.
+            // The land UI compares GameManager.Region.Role/Id with PersonalRegion.Region.Id.
+            // MoveToRegionToDo(Personal) also checks Role() == Personal.
         string regionId = playerContext.RegionId;
         bool onPersonal = !string.IsNullOrEmpty(regionId) &&
                           regionId.StartsWith("personal_", StringComparison.OrdinalIgnoreCase);
@@ -347,15 +347,15 @@ public class GameServer
         msg.Region.TemplateId = onPersonal
             ? (playerContext.PersonalRegionTemplateId ?? playerWorld.TerrainInfo.region_template)
             : playerWorld.TerrainInfo.region_template;
-        // TerrainId = ชื่อไฟล์ terrain จริง สำหรับโหลดแผนที่/chunk
+            // TerrainId is the actual terrain file name used to load maps and chunks.
         msg.Region.TerrainId = playerWorld.TerrainId ?? "1";
         msg.Region.Role = onPersonal ? Role.Personal : Role.Rural;
-        // เกาะส่วนตัวของผู้เล่น (ว่างได้ถ้ายังไม่สร้าง)
+            // The player's personal island, or empty if none has been created.
         msg.PersonalRegionId = string.IsNullOrEmpty(playerContext.PersonalRegionId)
             ? null
             : playerContext.PersonalRegionId;
         Console.WriteLine(
-            $"[welcome] {entityId[..Math.Min(8, entityId.Length)]} Region.Id={msg.Region.Id} Role={msg.Region.Role} TerrainId={msg.Region.TerrainId} TemplateId={msg.Region.TemplateId} PersonalRegionId={msg.PersonalRegionId ?? "(ว่าง)"}");
+            $"[welcome] {entityId[..Math.Min(8, entityId.Length)]} Region.Id={msg.Region.Id} Role={msg.Region.Role} TerrainId={msg.Region.TerrainId} TemplateId={msg.Region.TemplateId} PersonalRegionId={msg.PersonalRegionId ?? "(empty)"}");
         msg.Options.Bool = new[]
         {
             new BoolOption { Key = "market.ui_enabled", Value = true }

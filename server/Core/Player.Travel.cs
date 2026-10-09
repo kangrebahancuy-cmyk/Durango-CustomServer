@@ -171,7 +171,7 @@ public partial class Player
         //         ซึ่งใช้ .All(Packet.IsSuccess) ⇒ รับ OK ที่ HandleTravelMsg ส่งอยู่แล้วได้พอดี
         _connection.Recv(delegate(TravelToStableRegion msg, PacketHeader header)
         {
-            Console.WriteLine($"[เดินทาง] {Short(EntityId)} ย้ายไปเกาะที่มั่นคง '{msg.RegionId}'");
+            Console.WriteLine($"[travel] {Short(EntityId)} travelled to stable island '{msg.RegionId}'");
             HandleTravelMsg(msg.RegionId, header.Seq);
         });
 
@@ -191,7 +191,7 @@ public partial class Player
         // เดียวกับ SailingBack ที่ Player.cs:269-272 ใช้อยู่แล้ว คือกลับ "เกาะตั้งต้น" (RegionId = null)
         _connection.Recv(delegate(Withdraw msg, PacketHeader header)
         {
-            Console.WriteLine($"[เดินทาง] {Short(EntityId)} ถอนตัวจาก {_world.TerrainId} กลับเกาะตั้งต้น");
+            Console.WriteLine($"[travel] {Short(EntityId)} left {_world.TerrainId} returned to the starting island");
             HandleTravelMsg(null, header.Seq);
         });
 
@@ -204,7 +204,7 @@ public partial class Player
         //   (Points.LastReturnPoint เซิร์ฟส่ง null อยู่แล้ว — Player.Warp.cs:355)
         _connection.Recv(delegate(GetWarpBackCost msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานการวาร์ปกลับเกาะเดิม" }, header.Seq);
+            Send(new Abort { Text = "Returning to the previous island is not enabled yet" }, header.Seq);
         });
 
         // WarpBack (2110) — วาร์ปกลับเกาะที่สำรวจค้างไว้
@@ -212,7 +212,7 @@ public partial class Player
         // เซิร์ฟไม่ได้เก็บ "เกาะก่อนหน้า" และไม่เคยส่ง Points.LastReturnPoint ⇒ ไม่มีปลายทาง
         _connection.Recv(delegate(WarpBack msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่มีเกาะที่วาร์ปกลับได้ — ใช้ท่าเรือเดินทางแทน" }, header.Seq);
+            Send(new Abort { Text = "No return island is available yet; use a port to travel instead" }, header.Seq);
         });
 
         // OpenMap (915) {VoucherId} — "ซื้อแผนที่" เปิดหมุดทั้งเกาะรวดเดียว
@@ -222,7 +222,7 @@ public partial class Player
         //    ตอบหมุดเดิม = ผู้เล่นนึกว่าจ่ายแล้วแต่ไม่ได้อะไร ⇒ ปฏิเสธตรง ๆ ชัดเจนกว่า
         _connection.Recv(delegate(OpenMap msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานการซื้อแผนที่" }, header.Seq);
+            Send(new Abort { Text = "Map purchases are not enabled yet" }, header.Seq);
         });
 
         // ActivePersonalRegionWarphole (3022) {EntityId, Tile} — เปิดใช้รูวาร์ปส่วนตัว
@@ -231,7 +231,7 @@ public partial class Player
         // ผู้เล่นเป็นคนกดเมนูนี้เอง ⇒ ตอบ Abort ได้ตามข้อ ⑤ (ไม่ใช่ข้อความที่เกมยิงเอง)
         _connection.Recv(delegate(ActivePersonalRegionWarphole msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานระบบเกาะส่วนตัว" }, header.Seq);
+            Send(new Abort { Text = "Personal islands are not enabled yet" }, header.Seq);
         });
 
         // WarpToPersonalRegion (3023) — วาร์ปไปที่ดินบนเกาะส่วนตัวของตัวเอง
@@ -247,7 +247,7 @@ public partial class Player
         // จุดยิง: client/Durango.Logic.Interactions/ArtifactInteractions.cs:133-140 → TryWarp
         _connection.Recv(delegate(WarpToUrbanRegion msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานระบบที่ดินบนเกาะเมือง" }, header.Seq);
+            Send(new Abort { Text = "Town-island land permissions are not enabled yet" }, header.Seq);
         });
 
         // WarpToNextArchipelagoRegion (2035) — วาร์ปข้ามไปเกาะถัดไปของภารกิจหมู่เกาะ
@@ -257,7 +257,7 @@ public partial class Player
         // ตายตัวอยู่) ⇒ ไม่รู้ว่า "เกาะถัดไป" คือลูกไหนจริง ๆ — บอกทางที่ใช้ได้จริงแทน
         _connection.Recv(delegate(WarpToNextArchipelagoRegion msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานภารกิจหมู่เกาะ — ใช้ท่าเรือเดินทางแทน" }, header.Seq);
+            Send(new Abort { Text = "Archipelago missions are not enabled yet; use a port to travel instead" }, header.Seq);
         });
 
         // GetWarpCostToNextRegion (12033) — ราคาวาร์ปไปเกาะถัดไปของภารกิจหมู่เกาะ
@@ -266,7 +266,7 @@ public partial class Player
         // แต่ตอบว่าง = ปุ่มกดแล้วเงียบสนิท ⇒ ตอบ Abort ให้ผู้เล่นรู้เหตุผลตั้งแต่ขั้นถามราคา
         _connection.Recv(delegate(GetWarpCostToNextRegion msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานภารกิจหมู่เกาะ" }, header.Seq);
+            Send(new Abort { Text = "Archipelago missions are not enabled yet" }, header.Seq);
         });
 
         // GetWarpAcceleratorCost (21112519) — ค่าเข้าร่วมกิจกรรม "เร่งวาร์ป"
@@ -276,7 +276,7 @@ public partial class Player
         // ⇒ ตอบราคา 0 จะพาไปหน้าต่างที่กดยืนยันแล้วไม่มีอะไรรับต่อ — ปฏิเสธตรงนี้ชัดกว่า
         _connection.Recv(delegate(GetWarpAcceleratorCost msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานกิจกรรมเร่งวาร์ป" }, header.Seq);
+            Send(new Abort { Text = "Warp Accelerator events are not enabled yet" }, header.Seq);
         });
 
         // RecommendPersonalRegion (3002) {TemplateId} — สร้าง/เลือกภูมิประเทศเกาะส่วนตัวของตัวเอง
@@ -294,7 +294,7 @@ public partial class Player
         // ซึ่งเซิร์ฟส่ง null อยู่ (Player.Warp.cs:356) — แต่บทไกด์เรียกตรงได้ จึงต้องรับไว้
         _connection.Recv(delegate(ReturnToCamp msg, PacketHeader header)
         {
-            Send(new Abort { Text = "ยังไม่เปิดใช้งานระบบแคมป์" }, header.Seq);
+            Send(new Abort { Text = "Camp systems are not enabled yet" }, header.Seq);
         });
     }
 
@@ -379,9 +379,9 @@ public partial class Player
         bool known = tiles.Any(t => t.x == msg.Tile.x && t.y == msg.Tile.y);
         if (!known)
         {
-            Console.WriteLine($"[เดินทาง] ปฏิเสธวาร์ป {Short(EntityId)} → " +
+            Console.WriteLine($"[travel] Rejected warp {Short(EntityId)} → " +
                               $"[{msg.Tile.x},{msg.Tile.y}] — ไม่ใช่รูวาร์ปที่เจอแล้วบนเกาะนี้");
-            Send(new Abort { Text = "ที่นั่นไม่ใช่รูวาร์ปที่เคยพบ" }, seq);
+            Send(new Abort { Text = "That is not a discovered warp hole" }, seq);
             return;
         }
 
@@ -394,14 +394,14 @@ public partial class Player
     {
         if (_world.ArtifactManager.Get(msg.EntityId) is not { } artifact)
         {
-            Send(new Abort { Text = "ไม่พบรูวาร์ปนี้" }, seq);
+            Send(new Abort { Text = "Warp hole not found" }, seq);
             return;
         }
 
         MergedBlueprint blueprint = BlueprintStore.GetBlueprint(artifact.EntityType);
         if (blueprint?.Id == null || !WarpholeBlueprints.Contains(blueprint.Id))
         {
-            Send(new Abort { Text = "ที่นี่ใช้วาร์ปไม่ได้" }, seq);
+            Send(new Abort { Text = "Warping is not available here" }, seq);
             return;
         }
 
@@ -411,7 +411,7 @@ public partial class Player
         int reach = ArtifactReachTiles + Math.Max(artifact.Size.x, artifact.Size.y);
         if (!IsWithinTiles(artifact.Tile, reach))
         {
-            Send(new Abort { Text = "อยู่ไกลรูวาร์ปเกินไป" }, seq);
+            Send(new Abort { Text = "You are too far from the warp hole" }, seq);
             return;
         }
 
@@ -436,7 +436,7 @@ public partial class Player
 
         // ⚠️ Timer ต้องเป็นคำตอบแรกและตัวเดียวที่ seq นี้ (กับดัก ① ที่ Player.Warp.cs:38-42)
         Send(new Messages.Timer { Duration = duration }, seq);
-        Console.WriteLine($"[เดินทาง] {Short(EntityId)} {what} → [{tile.x},{tile.y}] (รอ {duration:0.#} วิ)");
+        Console.WriteLine($"[travel] {Short(EntityId)} {what} → [{tile.x},{tile.y}] (waiting {duration:0.#} sec)");
 
         if (duration <= 0f)
         {
@@ -453,7 +453,7 @@ public partial class Player
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[เดินทาง] ย้ายตัวไม่สำเร็จ: {e.Message}");
+                Console.WriteLine($"[travel] Character transfer failed: {e.Message}");
             }
             finally
             {
@@ -512,12 +512,12 @@ public partial class Player
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[แผนที่] อ่านขนาดเกาะ {regionId} ไม่ได้: {e.Message}");
+                Console.WriteLine($"[map] Could not read island size for {regionId}: {e.Message}");
                 data = null;
             }
             if (data == null)
             {
-                Send(new Abort { Text = "ไม่พบข้อมูลแผนที่ของเกาะนี้" }, seq);
+                Send(new Abort { Text = "No map data found for this island" }, seq);
                 return;
             }
             tilesX = data.Width;
@@ -568,7 +568,7 @@ public partial class Player
         // ฝั่งเกมตัดเองตามจำนวนช่องที่วางไว้บนหน้าจอ (RecommendRegionPage.cs:127-149)
         Route[] shuffled = routes.OrderBy(_ => System.Random.Shared.Next()).ToArray();
 
-        Console.WriteLine($"[เดินทาง] {Short(EntityId)} ขอรายชื่อเกาะที่มั่นคง — ส่งไป {shuffled.Length} ลูก");
+        Console.WriteLine($"[travel] {Short(EntityId)} requested stable island list; sent {shuffled.Length} islands");
         Send(new RecommendedStableRegions { Routes = shuffled }, seq);
     }
 
@@ -598,15 +598,15 @@ public partial class Player
         {
             // ฝั่งเกมมี .On<Error> รออยู่ (client/ExploreSystem.cs:238-242) แล้วปิดวงกลมโหลดให้
             // ⚠️ Error.Text ก็ต้องไม่เป็น null ด้วยเหตุผลเดียวกับ Abort (Player.cs:1985-1987)
-            Console.WriteLine($"[เดินทาง] ไม่มีเกาะที่ตรงคำขอ role={msg.Role} template='{msg.TemplateId}'");
-            Send(new Error { Text = "ยังไม่มีเกาะแบบนี้ในเซิร์ฟนี้" }, seq);
+            Console.WriteLine($"[travel] No island matches request role={msg.Role} template='{msg.TemplateId}'");
+            Send(new Error { Text = "This island type is not available on this server yet" }, seq);
             return;
         }
 
         // "แนะนำ" ในเกมจริงคือเซิร์ฟสร้างเกาะใหม่ให้ — ของเราเกาะมีอยู่ครบแล้วและอยู่ในหน้า
         // เส้นทางอยู่แล้ว ⇒ สุ่มคืนหนึ่งลูกที่มีจริง ฝั่งเกมจะขอ Routes ใหม่แล้วเห็นมันในลิสต์
         Messages.Region picked = candidates[System.Random.Shared.Next(candidates.Count)];
-        Console.WriteLine($"[เดินทาง] {Short(EntityId)} แนะนำเกาะ {picked.Id} ({picked.TemplateId})");
+        Console.WriteLine($"[travel] {Short(EntityId)} recommended island {picked.Id} ({picked.TemplateId})");
         Send(picked, seq);
     }
 
@@ -629,8 +629,8 @@ public partial class Player
 
         if (archipelagoId == null)
         {
-            Console.WriteLine($"[เดินทาง] ไม่มีหมู่เกาะระดับ {msg.Level} ไบโอม {msg.Biome}");
-            Send(new Abort { Text = "ยังไม่มีหมู่เกาะแบบนี้ในเซิร์ฟนี้" }, seq);
+            Console.WriteLine($"[travel] No archipelago found for level {msg.Level}, biome {msg.Biome}");
+            Send(new Abort { Text = "This archipelago type is not available on this server yet" }, seq);
             return;
         }
 
@@ -682,7 +682,7 @@ public partial class Player
         }
         else
         {
-            Console.WriteLine($"[เดินทาง] เกาะ {_world.TerrainId} ไม่มี template — ส่งเส้นทางข้างเคียงเปล่า");
+            Console.WriteLine($"[travel] Island {_world.TerrainId} has no template; returning an empty adjacent route");
         }
 
         Send(new RoutesOfArchipelago { ArchipelagoRoutes = archipelagoRoutes.ToArray() });
@@ -702,12 +702,12 @@ public partial class Player
 
         if (candidates.Count == 0)
         {
-            Send(new Abort { Text = "ยังไม่มีเกาะส่วนตัวให้ไปเยี่ยม" }, seq);
+            Send(new Abort { Text = "No personal island is available to visit yet" }, seq);
             return;
         }
 
         Messages.Region picked = candidates[System.Random.Shared.Next(candidates.Count)];
-        Console.WriteLine($"[เดินทาง] {Short(EntityId)} ออกเรือสุ่มไปเกาะส่วนตัว {picked.Id}");
+        Console.WriteLine($"[travel] {Short(EntityId)} departed randomly for personal island {picked.Id}");
         HandleTravelMsg(picked.Id, seq);
     }
 }
