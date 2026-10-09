@@ -169,7 +169,8 @@
       const value = originalText.get(node), trimmed = value.trim();
       if (!trimmed) return;
       const result = translate(trimmed);
-      node.nodeValue = result === trimmed ? value : value.replace(trimmed, result);
+      const target = result === trimmed ? value : value.replace(trimmed, result);
+      if (node.nodeValue !== target) node.nodeValue = target;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       for (const attr of ['placeholder', 'title', 'aria-label']) {
         if (node.hasAttribute(attr)) {
