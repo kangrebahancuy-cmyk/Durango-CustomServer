@@ -27,7 +27,7 @@
     {
       "Id": "isle03",
       "Name": "เกาะป่าร้อนชื้น",
-      "Terrain": "tr40tropic",
+      "Terrain": "ri40tr",
       "MinLevel": 20,
       "MaxLevel": 30,
       "RequiredLevel": 18,
@@ -39,7 +39,7 @@
     {
       "Id": "isle04",
       "Name": "เกาะทะเลทราย",
-      "Terrain": "de50desert",
+      "Terrain": "ri35de",
       "MinLevel": 30,
       "MaxLevel": 40,
       "RequiredLevel": 28,
@@ -51,7 +51,7 @@
     {
       "Id": "isle05",
       "Name": "เกาะภูเขาไฟ",
-      "Terrain": "vo60volcan",
+      "Terrain": "ua60vol",
       "MinLevel": 50,
       "MaxLevel": 60,
       "RequiredLevel": 48,
