@@ -644,7 +644,7 @@ Console.WriteLine("[gateway] /players rejected: no valid session");
             if (string.IsNullOrEmpty(entries))
                 return new WebServer.JsonResponse(new JObject { ["error"] = "entries is required" }.ToString(), HttpStatusCode.BadRequest);
             string path = Path.Combine(DataDir ?? Json.DataDir, "whitelist.txt");
-            File.WriteAllText(path, # Allowed players (entity ID or character name, one per line)\n + entries);
+            File.WriteAllText(path, "# Allowed players (entity ID or character name, one per line)\n" + entries);
             Console.WriteLine("[admin] whitelist.txt updated");
             return new WebServer.JsonResponse(new JObject { ["saved"] = true }.ToString());
         };
