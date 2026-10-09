@@ -1,84 +1,72 @@
-﻿# Durango LastHuman
+# Durango Custom Server
 
-เซิร์ฟเวอร์ส่วนตัวของเกม **Durango: Wild Lands** สร้างจากโค้ดเซิร์ฟที่ NEXON ฝังมาในตัวเกมเอง
-พอร์ตขึ้น .NET 9 แล้วเปลี่ยนชื่อ `Durango.Offline` → **`Durango.Online`** เพราะโปรเจกต์นี้ทำเวอร์ชันออนไลน์เท่านั้น
+Server eksperimental untuk Durango: Wild Lands, dikembangkan dengan .NET 9.
 
-## โครงสร้าง
+> Catatan: repository ini terutama berisi source code server. File game tidak disertakan di Git dan harus disiapkan secara terpisah sesuai hak penggunaan yang berlaku.
 
-```
-server/          เซิร์ฟ .NET 9
-  Core/          ตัวเซิร์ฟ (Host, GameServer, Gateway, World, Player, ...)
-  Support/       shim แทนของที่อยู่ใน Unity (Yaml/prototype/สี/แปลภาษา)
-  GameCode/      ชั้น protocol + data ของเกม (Messages/ 852 ตัว TypeCode ตรงต้นฉบับ 100%)
-  Shims/         UnityEngine shim (Mathf/Vector/Random/Debug)
-  data/          terrain 14 แผนที่ · assets (prototype/recipe/artifact/pet) · config.json
-client/          ซอร์สเกม (Assembly-CSharp) ของ NEXON แท้ 3,755 ไฟล์
-game/            ตัวเกมที่เล่นได้จริง (ไม่อยู่ใน git — ก๊อปมาจากชุดแจก)
-tools/           สคริปต์ build / เปิดเซิร์ฟ / สแกนโปรโตคอล
-docs/           ROADMAP.md · ROADMAP-NEXT.md · TODO.md · NEXON-SERVER-ARCHITECTURE.md · ITEM-SYSTEM-MAP.md · protocol-coverage.md
-```
+## Struktur repository
 
-## เริ่มใช้งาน
+- `server/` — source code server .NET 9, protocol, world, gateway, dan data yang tersedia di repository.
+- `tools/start-server.ps1` — menu Windows untuk build, menjalankan server, dan selftest.
+- `เปิดเซิร์ฟ.bat` — pembuka menu pada Windows.
+- `game/` — folder lokal untuk file game; diabaikan oleh Git dan tidak disertakan dalam repository.
 
-ดับเบิลคลิก **`เปิดเซิร์ฟ.bat`** แล้วเลือกจากเมนู:
+Source client, dokumen roadmap, dan beberapa skrip lama yang disebut dalam dokumentasi sebelumnya tidak tersedia pada branch ini. Karena itu, perintah build client dan scan-protocol tidak disediakan oleh launcher ini.
 
-| เมนู | ทำอะไร |
+## Persyaratan
+
+- Windows 10/11
+- .NET 9 SDK
+- PowerShell (tersedia di Windows)
+
+Unduh .NET 9 SDK: https://dotnet.microsoft.com/download/dotnet/9.0
+
+## Menjalankan di Windows
+
+1. Clone atau unduh repository.
+2. Pastikan .NET 9 SDK terpasang.
+3. Klik dua kali `เปิดเซิร์ฟ.bat`.
+4. Pilih menu `2` untuk build server, atau `3` untuk build lalu menjalankan server.
+5. Pilih menu `4` untuk menjalankan selftest.
+
+Menu launcher:
+
+| Menu | Fungsi |
 |---|---|
-| 1 | เปิดเซิร์ฟ (gateway 8190 / เกม 8191) |
-| 2 | build ใหม่แล้วเปิด |
-| 3 | หยุดเซิร์ฟ |
-| 4 | selftest — เช็ค handshake (ต้องเปิดเซิร์ฟก่อน) |
-| 5 | เปิดเกม |
-| 6 | ดู log ล่าสุด |
+| 1 | Jalankan server (gateway HTTP 8190, game TCP 8191) |
+| 2 | Build server Release |
+| 3 | Build lalu jalankan server |
+| 4 | Jalankan selftest pada port sementara 18290/18291 |
+| 5 | Buka folder game lokal jika tersedia |
+| 6 | Lihat 100 baris log terakhir |
+| 0 | Keluar dari menu |
 
-หรือสั่งเองจากบรรทัดคำสั่ง:
+Jendela server berjalan terpisah. Untuk menghentikan server dengan aman, fokuskan jendela server lalu tekan **Ctrl+C** dan tunggu sampai proses selesai menyimpan data. Hindari mematikan proses secara paksa.
 
-```bash
-dotnet build server -c Release
-dotnet build client -c Release
-powershell -File tools\build-client.ps1     # build ซอร์สเกมแล้ววาง DLL ลง game\
+Log disimpan secara lokal di `logs/server-latest.log`; folder log tidak dikomit ke Git.
+
+## Build dari terminal
+
+Jalankan dari folder utama repository:
+
+```powershell
+dotnet --list-sdks
+dotnet build server/DurangoServer.csproj -c Release
 ```
 
-## พอร์ต
+Jika build gagal, simpan seluruh pesan error dari terminal agar penyebabnya dapat diperiksa. Jangan menghapus folder `bin`, `obj`, atau data save sebelum ada diagnosis.
 
-| พอร์ต | ใช้ทำอะไร |
+## Port server
+
+| Port | Fungsi |
 |---|---|
-| 8190 | HTTP gateway — `/knock` `/sessions` `/entry` `/players` `/terrains` |
-| 8191 | TCP game — handshake `GetClock` → `Auth` → `Ready` แล้วเข้าโลก |
+| 8190/TCP | HTTP gateway, termasuk endpoint seperti `/knock`, `/sessions`, dan `/entry` |
+| 8191/TCP | Koneksi game dan handshake |
 
-`game/server.txt` ต้องชี้ `127.0.0.1:8190` (ค่าเริ่มต้นตรงอยู่แล้ว)
+Untuk pengujian pada komputer yang sama, gunakan `127.0.0.1`. Agar perangkat lain dapat terhubung, pastikan binding gateway, Windows Firewall, firewall router/VPS, serta alamat gateway pada client dikonfigurasi dengan benar. Jangan membuka port ke internet sebelum akses dan keamanan ditinjau.
 
-ถ้าจะให้เครื่องอื่น (มือถือ/เพื่อนใน LAN) เข้าได้ ต้องรันครั้งเดียวแบบ **Run as administrator**:
+## Status
 
-```bash
-netsh http add urlacl url=http://*:8190/ user=Everyone
-```
+File `เปิดเซิร์ฟ.bat` memanggil `tools/start-server.ps1`, tetapi skrip tersebut sebelumnya tidak ada di repository. Skrip launcher kini ditambahkan kembali pada branch perbaikan ini.
 
-ไม่งั้นเซิร์ฟจะตกไปฟังแค่ loopback (log บอกเอง: `wildcard bind denied, falling back to loopback`)
-
-## รู้ว่าเซิร์ฟยังขาดอะไร
-
-```bash
-python tools/scan-protocol.py          # สรุปลงจอ แยกตามระบบ
-python tools/scan-protocol.py --md     # เขียน docs/protocol-coverage.md
-```
-
-สคริปต์อ่านจากซอร์สจริง: `Send(new X{..})` ในซอร์สเกม เทียบกับ `Recv(delegate(X msg, ..))` ในเซิร์ฟ
-ตอนเล่นจริงเซิร์ฟก็พิมพ์บอกเองด้วย — `[conn] ไม่มี handler สำหรับ type=NNNN`
-เอาเลขไปหาชื่อ: `grep -l "TypeCode = NNNN" server/GameCode/Messages/*.cs`
-
-## สถานะ
-
-- เซิร์ฟ build ผ่าน · selftest ผ่าน (handshake + entity + chunk streaming)
-- ซอร์สเกม build ผ่าน · เกมเปิดได้
-- รับ message ได้ **42 ชนิด** จากที่เกมยิงออกมา **391** — งานต่อไปดู [docs/ROADMAP.md](docs/ROADMAP.md)
-- งานถัดไปที่ตกลงกันไว้: **ระบบล่องเรือ/หมู่เกาะ** (ต้องรื้อให้เซิร์ฟรองรับหลาย region ก่อน)
-
-## แผนงานล่าสุด
-
-- รายการติ๊ก: [docs/TODO.md](docs/TODO.md)
-- แผนเฟสถัดไป: [docs/ROADMAP-NEXT.md](docs/ROADMAP-NEXT.md)
-- สถาปัตยกรรม Nexon (อ้างอิง): [docs/NEXON-SERVER-ARCHITECTURE.md](docs/NEXON-SERVER-ARCHITECTURE.md)
-- ประวัติ/รายละเอียดเดิม: [docs/ROADMAP.md](docs/ROADMAP.md)
-- แผนที่ระบบไอเทม/เลเวล/แอต/บัฟ: [docs/ITEM-SYSTEM-MAP.md](docs/ITEM-SYSTEM-MAP.md)
-
+Build dan selftest belum dijalankan di lingkungan ini. Jalankan menu 2 dan menu 4 pada Windows dengan .NET 9 SDK sebelum menggunakan server secara publik.

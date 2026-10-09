@@ -9,73 +9,73 @@ using Yaml.Util;
 
 namespace DurangoServerNx;
 
-// DurangoServerNx — เซิร์ฟเกมพอร์ตตรงจากเซิร์ฟในตัวของตัวเกม (nexonSRC/Durango.Online)
-// รองรับ client มือถือ (Android 5.2.1 แท้) เป็นหลัก — โครงร่างและรูปแบบข้อมูลตามต้นฉบับ
+// DurangoServerNx — server ported from the game's built-in server (nexonSRC/Durango.Online).
+// Primarily supports the original Android 5.2.1 client; structure and data formats follow the original.
 //
-// การใช้งาน:
-//   DurangoServerNx [--name <ชื่อ cluster>] [--gateway-port 8190] [--game-port 8191]
-//                   [--data <โฟลเดอร์ data>] [--terrains <โฟลเดอร์ terrain zip>]
-//                   [--assetbundles-android <โฟลเดอร์ bundle>] [--public-host <ip/ชื่อ>]
+// Usage:
+//   DurangoServerNx [--name <cluster name>] [--gateway-port 8190] [--game-port 8191]
+//                   [--data <data directory>] [--terrains <terrain zip directory>]
+//                   [--assetbundles-android <bundle directory>] [--public-host <ip/host>]
 //                   [--max-players N] [--cluster-mode Offline|Online|Editable]
 internal static class Program
 {
     private static int _ticksPerSecond = 120;
 
-    /// <summary>host ที่กำลังรัน — ให้ตัวจัดการปิดเครื่องเซฟได้ก่อนออก</summary>
+    /// <summary>Currently running host; allows the process manager to save before exit.</summary>
     private static Host _host;
 
     private static int _shutdownDone;
 
-    /// <summary>เซฟทุกอย่างแล้วปิดให้เรียบร้อย — เรียกซ้ำได้ (ทำจริงครั้งเดียว)</summary>
+    /// <summary>Save all state and shut down cleanly; safe to call repeatedly.</summary>
     private static void ShutdownSafely(string reason)
     {
         if (System.Threading.Interlocked.Exchange(ref _shutdownDone, 1) != 0) return;
         try
         {
-            Console.WriteLine($"[boot] ปิดเซิร์ฟ ({reason}) — เซฟก่อน...");
+            Console.WriteLine($"[boot] Shutting down server ({reason}); saving first...");
             _host?.SaveAll();
             _host?.Close();
-            Console.WriteLine("[boot] เซฟเรียบร้อย");
+            Console.WriteLine("[boot] Save completed successfully");
         }
         catch (Exception e)
         {
-            Console.WriteLine("[boot] ⚠️ เซฟตอนปิดไม่สำเร็จ: " + e.Message);
+            Console.WriteLine("[boot] ⚠️ Save during shutdown failed: " + e.Message);
         }
     }
 
     private static int Main(string[] args)
     {
-        // [5 ก.ย. 2026] เดิม Ctrl+C เรียก Environment.Exit(0) ทันทีโดยไม่เซฟ และ Host.Close()
-        // (ตัวที่เซฟโลกก่อนปิด) ไม่เคยถูกเรียกจากที่ไหนเลย ⇒ **รีสตาร์ทเซิร์ฟทุกครั้ง ของหายได้ถึง 60 วิ**
-        // (รอบ autosave) ตอนนี้เซฟก่อนออกเสมอ ทั้งทาง Ctrl+C, ปิด process ปกติ และ crash
+        // [Sep 5, 2026] Ctrl+C previously called Environment.Exit(0) without saving; Host.Close()
+        // (which saves the world before shutdown) was never called, so each restart could lose up to 60 seconds.
+        // The server now saves before Ctrl+C, normal process exit, and crashes whenever possible.
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
             ShutdownSafely("Ctrl+C");
             Environment.Exit(0);
         };
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => ShutdownSafely("ปิดโปรเซส");
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => ShutdownSafely("process exit");
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
-            Console.WriteLine("[boot] ❌ exception ที่ไม่มีใครรับ: " + (args.ExceptionObject as Exception)?.Message);
+            Console.WriteLine("[boot] ❌ Unhandled exception: " + (args.ExceptionObject as Exception)?.Message);
             ShutdownSafely("crash");
         };
         try
         {
-            // คอนโซล Windows default codepage อ่านไทยไม่ได้
+            // Keep console output in English for consistent Windows code-page support.
             Console.OutputEncoding = System.Text.Encoding.UTF8;
         }
         catch (Exception) { }
 
         // ---- CLI ----
         string name = "nx";
-        int gatewayPort = Gateway.DefaultPort;   // 8190 — ค่าแท้ที่ client มือถือฝังมาในตัว
+        int gatewayPort = Gateway.DefaultPort;   // 8190 is the port hardcoded into the mobile client.
         int gamePort = GameServer.DefaultPort;   // 8191
         string dataDir = Path.Combine(AppContext.BaseDirectory, "data");
         string androidBundles = null;
         string publicHost = null;
         int maxPlayers = 200;
-        // token ของ /health — เอาจาก env ได้ด้วย จะได้ไม่ต้องโผล่ในบรรทัดคำสั่ง (ps เห็นหมด)
+        // The /health token can be supplied through an environment variable to avoid exposing it in process arguments.
         string adminToken = Environment.GetEnvironmentVariable("DURANGO_ADMIN_TOKEN");
         string admins = Environment.GetEnvironmentVariable("DURANGO_ADMINS");
         string minClientVersion = null;
@@ -166,15 +166,15 @@ internal static class Program
                         i++;
                     }
                     int rc = SelfTestPackages.Run(stGateway, stGame);
-                    // thread รับ packet ไม่ใช่ background — ไม่ Exit โปรเซสจะค้างล็อก dll ตัวเองไว้
+                    // The packet listener is not a background thread; exiting incorrectly can leave the DLL locked.
                     Environment.Exit(rc);
                     return rc;
                 }
-                // [7 ก.ย. 2026] ตรวจตารางเก็บเกี่ยว/เมนูสิ่งปลูกสร้าง **โดยไม่ต้องเปิดเซิร์ฟ**
+                // [Sep 7, 2026] Validate harvest tables and building menus without starting the server.
                 //
-                // มีไว้เพราะบั๊กสองตัวที่เพิ่งแก้ (ต้นกกไม่ให้ลำต้น · กองไฟไม่มีปุ่มจุดไฟ) เป็นเรื่อง
-                // "ข้อมูลที่เซิร์ฟส่งให้เกม" ล้วน ๆ ⇒ ตรวจได้จากตารางตรง ๆ ไม่ต้องเข้าเกมจริง
-                // ⇒ รอบหน้าที่แตะ CollectibleTable/HandleTouchMsg เช็คซ้ำได้ในคำสั่งเดียว
+                // These checks cover data-driven issues such as missing reed stalks and the campfire ignition button.
+                // They concern data sent by the server to the game and can be validated directly from tables.
+                // Re-run these checks whenever CollectibleTable or HandleTouchMsg changes.
                 case "--check-data":
                 {
                     MoCatalog.Load(dataDir);
@@ -192,9 +192,9 @@ internal static class Program
                 case "--public-host": publicHost = args[++i]; break;
                 case "--url-prefix":
                 {
-                    // [4 ก.ย. 2026] client มือถือฝัง "8190" มาต่อท้าย literal เอง (int แก้ค่าไม่ได้) ⇒ ถ้าจะรัน
-                    // เซิร์ฟนี้บนพอร์ตอื่น (เช่นแชร์เครื่องเดียวกับ server/ เดิมที่คุม 8190 อยู่แล้ว) ต้องแพตช์ literal
-                    // เป็น "http://ip:<พอร์ตจริง>/p" แล้วตัด prefix "/p8190" ทิ้งก่อน route (ดู docs/server/Android.md)
+                    // [Sep 4, 2026] The mobile client appends the literal port 8190; it cannot be changed as an integer.
+                    // To run this server on another port, patch the literal in the client.
+                    // Use "http://ip:<actual-port>/p" and strip the "/p8190" prefix before routing. See the Android documentation.
                     string prefix = args[++i].Trim();
                     if (!prefix.StartsWith("/")) prefix = "/" + prefix;
                     Durango.Online.WebServer.PathPrefix = prefix.TrimEnd('/');
@@ -202,12 +202,12 @@ internal static class Program
                 }
                 case "--max-players": maxPlayers = int.Parse(args[++i]); break;
 
-                // ย้ายข้อมูลครั้งเดียว — ให้บัญชีแรกที่เข้ามารับตัวละครที่ยังไม่มีเจ้าของไป
-                // ⚠️ ห้ามเปิดค้างตอนเปิดให้คนนอกเล่น (ดู Core/Host.AdoptOrphans)
+                // One-time migration: let the first account that connects adopt unowned characters.
+                // ⚠️ Never leave this enabled when allowing public players. See Core/Host.AdoptOrphans.
                 case "--adopt-orphans": Host.AdoptOrphans = true; break;
 
-                // รายชื่อผู้ดูแล (entity id ของตัวละคร คั่นด้วยจุลภาค) — คนเดียวที่ใช้คำสั่ง cheat ได้
-                // ไม่ตั้ง = ไม่มีใครใช้ได้เลย ซึ่งเป็นค่าที่ปลอดภัยตอนเปิดให้คนนอกเล่น
+                // Administrator character entity IDs, comma-separated; only these players can use cheat commands.
+                // If unset, cheat commands are disabled for everyone, which is safest for public servers.
                 case "--admins": admins = args[++i]; break;
                 case "--min-client-version": minClientVersion = args[++i]; break;
                 case "--download-url": downloadUrl = args[++i]; break;
@@ -218,18 +218,18 @@ internal static class Program
                     break;
                 case "--help":
                 case "-h":
-                    Console.WriteLine("DurangoServerNx — เซิร์ฟแท้พอร์ตตรง · มือถือก่อน");
-                    Console.WriteLine("  --quest-check [--data <dir>]  ตรวจแคตตาล็อก Daily เฟส 1 (ไม่ต้องเปิดเซิร์ฟ)");
-                    Console.WriteLine("  --fx-check [--data <dir>]     ตรวจแพ็กเก็ต Rewarded ของเลเวลขึ้น / หมวดขึ้น");
-                    Console.WriteLine("  --se-check [--data <dir>]     ตรวจกติกาบัพโลก (ฝน/น้ำ → wet)");
-                    Console.WriteLine("  --farm-check [--data <dir>]   ตรวจวงจรเก็บเกี่ยวแปลง (grows_to → ของในกระเป๋า)");
+                    Console.WriteLine("DurangoServerNx — native server port, mobile-client focused");
+                    Console.WriteLine("  --quest-check [--data <dir>]  Validate the Phase 1 daily catalog (server does not need to be running)");
+                    Console.WriteLine("  --fx-check [--data <dir>]     Validate level-up and category-up reward packets");
+                    Console.WriteLine("  --se-check [--data <dir>]     Validate world buff rules (rain/water → wet)");
+                    Console.WriteLine("  --farm-check [--data <dir>]   Validate crop harvesting flow (grows_to → inventory items)");
                     Console.WriteLine("  --name, --gateway-port, --game-port, --data, --terrains, --terrain,");
                     Console.WriteLine("  --assetbundles-android, --public-host, --url-prefix, --max-players, --tps, --cluster-mode,");
-                    Console.WriteLine("  --admin-token <t>   token ของ /health (หรือ env DURANGO_ADMIN_TOKEN) — ไม่ตั้ง = เรียกได้เฉพาะเครื่องตัวเอง");
-                    Console.WriteLine("  --adopt-orphans     ให้บัญชีแรกที่เข้ามารับตัวละครที่ยังไม่มีเจ้าของ (ใช้ตอนย้ายข้อมูลครั้งเดียว ห้ามเปิดค้าง)");
-                    Console.WriteLine("  --admins <id,id>    entity id ของผู้ดูแล (หรือ env DURANGO_ADMINS) — ไม่ตั้ง = คำสั่ง cheat ปิดสนิท");
-                    Console.WriteLine("  --min-client-version <v>  เวอร์ชันตัวเกมต่ำสุดที่ยอมให้เข้า — ไม่ตั้ง = รับทุกเวอร์ชัน");
-                    Console.WriteLine("  --download-url <url>      ลิงก์โหลดตัวเกมใหม่ (ต้องมีถ้าเปิดด่านเวอร์ชัน)");
+                    Console.WriteLine("  --admin-token <t>   token for /health (or DURANGO_ADMIN_TOKEN env); if unset, accessible only from localhost");
+                    Console.WriteLine("  --adopt-orphans     allow the first account to adopt unowned characters (one-time migration only; never leave enabled)");
+                    Console.WriteLine("  --admins <id,id>    admin character entity IDs (or DURANGO_ADMINS env); if unset, cheat commands are disabled");
+                    Console.WriteLine("  --min-client-version <v>  minimum allowed client version; if unset, accept all versions");
+                    Console.WriteLine("  --download-url <url>      download URL for the client; required when version gating is enabled");
                     return 0;
             }
         }
@@ -239,36 +239,36 @@ internal static class Program
             Player.Admins.Add(id.Trim());
         }
 
-        Console.WriteLine("=== DurangoServerNx (เซิร์ฟแท้พอร์ตตรง · มือถือก่อน) ===");
+        Console.WriteLine("=== DurangoServerNx (native server port · mobile-client focused) ===");
         Console.WriteLine(Player.Admins.Count > 0
-            ? $"[boot] ผู้ดูแล {Player.Admins.Count} คน — ใช้คำสั่ง cheat ได้เฉพาะคนเหล่านี้"
-            : "[boot] ไม่ได้ตั้งผู้ดูแล (--admins) — คำสั่ง cheat ปิดสนิททุกคน");
+            ? $"[boot] {Player.Admins.Count} administrator(s) configured; only these players can use cheat commands"
+            : "[boot] No admins configured (--admins); cheat commands are disabled for everyone");
         if (Host.AdoptOrphans)
         {
-            Console.WriteLine("[boot] ⚠️⚠️ --adopt-orphans เปิดอยู่ — บัญชีแรกที่ต่อเข้ามาจะได้ตัวละครที่ยังไม่มีเจ้าของไปทั้งหมด");
-            Console.WriteLine("[boot]      ใช้ตอนย้ายข้อมูลครั้งเดียวเท่านั้น **ปิดก่อนเปิดให้คนนอกเล่น**");
+            Console.WriteLine("[boot] ⚠️⚠️ --adopt-orphans is enabled; the first account to connect will adopt all unowned characters");
+            Console.WriteLine("[boot]      Use for one-time migration only. Disable before allowing public players.");
         }
         Console.WriteLine($"[boot] data={dataDir} terrains={TerrainLoader.TerrainDir}");
 
-        // ---- game data (เทียบเท่า Loader ของ client) ----
-        // ⚠️ ต้องโหลด**ก่อน** DataStore — ตัวนั้นอ่าน JSON แล้วสร้าง Gettext ทันที
-        // ซึ่ง Gettext.ToString() จะไปหยิบคำแปลจาก catalog นี้ (ดู Support/MoCatalog.cs)
+        // ---- Game data (equivalent to the client Loader) ----
+        // ⚠️ Load this before DataStore, which reads JSON and initializes Gettext immediately.
+        // Gettext.ToString() retrieves translations from this catalog. See Support/MoCatalog.cs.
         MoCatalog.Load(dataDir);
         DataStore.Load(dataDir);
 
-        // สารบัญเกาะ — ระบบล่องเรือใช้ตอบว่าจากท่าเรือนี้ไปไหนได้บ้าง (ต้องหลัง TerrainLoader.TerrainDir)
+        // Island catalog used by boat travel to list destinations from each port; load after TerrainLoader.TerrainDir.
         WorkbenchTags.AssetsDir = Path.Combine(dataDir, "assets");
         RegionCatalog.Load(Path.Combine(dataDir, "assets"));
 
         // ---- host + saves ----
-        // AppData (เซฟ .player/.world) อยู่ข้าง ๆ data เหมือนเกมเก็บ AppData ของมันเอง
+        // AppData (.player/.world saves) is stored beside the data directory, as in the original game.
         AppData.BasePath = Path.GetFullPath(Path.Combine(dataDir, "..", "AppData-nx"));
         var host = new Host(name);
         _host = host;
-        // [5 ก.ย. 2026] ค่าพวกนี้ต้องตั้ง **ก่อน** host.Start() เพราะ Start เป็นคนสร้าง Gateway
-        // แล้วส่ง AdminToken ต่อให้ตอนนั้น (เดิม --max-players ถูกพิมพ์ออกจอเฉย ๆ ไม่มีใครใช้)
+        // [Sep 5, 2026] Set these values before host.Start(), because Start creates the Gateway.
+        // AdminToken is passed during creation; previously --max-players was only printed and never applied.
         host.MaxPlayers = maxPlayers;
-        // เพดานสาย TCP คิดจากเพดานผู้เล่น — --max-players กันได้แค่ประตู HTTP
+        // TCP connection limits follow the player limit; --max-players alone only limits the HTTP gateway.
         GameServer.MaxPlayersHint = maxPlayers;
         host.AdminToken = adminToken;
         host.MinClientVersion = minClientVersion;
@@ -277,35 +277,35 @@ internal static class Program
 
         try
         {
-            // assets = ตารางข้อมูลเกมที่ client โหลดผ่าน HTTP เมื่อ cluster_mode = Online
-            // (client/Yaml.Util/Loader.cs:164 — โหมดอื่นมันอ่านจาก Resources ในตัวเกมแทน)
+            // Assets are game data that the client downloads over HTTP when cluster_mode = Online.
+            // (client/Yaml.Util/Loader.cs:164; other modes read Resources bundled in the game.)
             host.Start(gamePort, gatewayPort, publicHost, androidBundles, Path.Combine(dataDir, "assets"), dataDir);
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[boot] ❌ เปิดพอร์ตไม่สำเร็จ: {e.Message}");
-            Console.WriteLine("       (8190 ต้อง netsh urlacl หรือรันด้วยสิทธิ์ที่พอ — ดู docs/server/ServerNx.md)");
+            Console.WriteLine($"[boot] ❌ Failed to open ports: {e.Message}");
+            Console.WriteLine("       (port 8190 may require a netsh URL ACL or elevated privileges; see docs/server/ServerNx.md)");
             return 1;
         }
 
-        Console.WriteLine($"[boot] พร้อม — gateway http://0.0.0.0:{gatewayPort} · game tcp:{gamePort} · " +
+        Console.WriteLine($"[boot] Ready — gateway http://0.0.0.0:{gatewayPort} · game tcp:{gamePort} · " +
                           $"cluster_mode={Host.ClusterMode} · max-players={maxPlayers}");
-        Console.WriteLine("[boot] มือถือ: ต่อ gateway port 8190 ตามที่ APK ฝังมา (หรือ --url-prefix ถ้าเปลี่ยนพอร์ต)");
+        Console.WriteLine("[boot] Mobile clients connect to gateway port 8190 as embedded in the APK (or use --url-prefix if changed).");
         Console.WriteLine(string.IsNullOrEmpty(adminToken)
-            ? "[boot] /health เปิดเฉพาะ 127.0.0.1 (ยังไม่ได้ตั้ง --admin-token)"
-            : "[boot] /health ต้องมี ?token=… (ตั้งจาก --admin-token/env แล้ว)");
+            ? "[boot] /health is restricted to 127.0.0.1 because --admin-token is not configured"
+            : "[boot] /health requires ?token=… (configured through --admin-token or environment)");
 
-        // ---- main loop (ต้นฉบับ: GameManager.Update → Server.Process ทุกเฟรม; เซิร์ฟรันคงที่ 120 TPS) ----
+        // ---- Main loop: GameManager.Update → Server.Process each frame; target is 120 TPS. ----
         int frameMs = 1000 / _ticksPerSecond;
         long lastSave = 0;
         int loopErrors = 0;
         ServerMetrics.MarkBoot();
         while (true)
         {
-            // [5 ก.ย. 2026] จับเวลาต่อรอบให้ /health อ่าน — ใช้ Stopwatch.GetTimestamp() ซึ่งเป็นการ
-            // อ่านตัวนับของ CPU ตรง ๆ (ระดับ 20 ns) ไม่ได้สร้าง object อะไร ⇒ ใส่ในลูป 120 รอบ/วิ ได้
-            // เก็บ 2 ค่า: เวลาทำงานจริง (host.Process) กับเวลารอบเต็ม (รวม sleep + เซฟ)
-            // เพราะอาการ "tps ตก" อาจมาจากงานล้น หรือจาก GC ที่หยุดโลกตอนไหนก็ได้
+            // [Sep 5, 2026] Measure each tick for /health using Stopwatch.GetTimestamp().
+            // It reads the CPU counter directly (around 20 ns) without allocating objects, so it is safe at 120 ticks per second.
+            // Track both host.Process work time and full tick duration including sleep and saves.
+            // TPS drops may come from overloaded work or a garbage-collection pause.
             long tickBegin = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
@@ -313,21 +313,21 @@ internal static class Program
             }
             catch (Exception e)
             {
-                // ต้องดังพอให้เห็น ไม่ใช่กลืนเงียบ ๆ — และถ้าพังรัว ๆ ให้ยอมตายเพื่อไม่ให้วนเสียหาย
+                // Errors must be visible; if failures repeat continuously, stop instead of looping in a damaged state.
                 loopErrors++;
                 ServerMetrics.RecordLoopError();
-                Console.WriteLine($"[loop] ⚠️ ข้อผิดพลาดรอบที่ {loopErrors}: {e}");
+                Console.WriteLine($"[loop] ⚠️ Error on iteration {loopErrors}: {e}");
                 if (loopErrors >= 100)
                 {
-                    Console.WriteLine("[loop] ❌ ผิดพลาดถี่เกินไป — ปิดเซิร์ฟ");
-                    ShutdownSafely("ข้อผิดพลาดถี่เกินไป");
+                    Console.WriteLine("[loop] ❌ Too many repeated errors; shutting down server");
+                    ShutdownSafely("too many repeated errors");
                     return 1;
                 }
             }
             long workEnd = System.Diagnostics.Stopwatch.GetTimestamp();
             Thread.Sleep(frameMs);
 
-            // เซฟโลกทุก 60 วิ (ต้นฉบับเซฟทันทีทุก event — เพิ่มเข็มขัดนิรภัยเหมือนเซิร์ฟเดิม)
+            // Save the world every 60 seconds as a safety net; the original server saved immediately on each event.
             long now = Environment.TickCount64;
             if (now - lastSave > 60_000)
             {
