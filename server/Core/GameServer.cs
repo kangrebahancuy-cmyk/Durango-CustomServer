@@ -118,7 +118,7 @@ public class GameServer
 
         foreach (Connection connection in stale)
         {
-            Console.WriteLine("[auth] ตัดสายที่ไม่ผ่าน Auth ภายในเวลาที่กำหนด");
+            Console.WriteLine("[auth] Disconnected a connection that did not authenticate before timeout");
             _pendingAuth.Remove(connection);
             try { connection.Close(); } catch (Exception) { }
             _connections.Remove(connection);
@@ -183,8 +183,8 @@ public class GameServer
 
         if (!AccountKeys.Same(owner, target.OwnerKey))
         {
-            Console.WriteLine($"[auth] ปฏิเสธการผูก session: บัญชี {AccountKeys.ForLog(owner)} " +
-                              $"ไม่ใช่เจ้าของตัวละคร {entityId} (เจ้าของ {AccountKeys.ForLog(target.OwnerKey)})");
+            Console.WriteLine($"[auth] Rejected session binding: account {AccountKeys.ForLog(owner)} " +
+                              $"does not own character {entityId} (owner {AccountKeys.ForLog(target.OwnerKey)})");
             return false;
         }
         _sessionTokens[token] = entityId;
@@ -230,7 +230,7 @@ public class GameServer
     {
         if (_connections.Count >= MaxConnections)
         {
-            Console.WriteLine($"[auth] ปฏิเสธสายใหม่ — เต็มเพดาน ({_connections.Count}/{MaxConnections})");
+            Console.WriteLine($"[auth] Rejected new connection — connection cap reached ({_connections.Count}/{MaxConnections})");
             try { socket.Close(); } catch (Exception) { }
             return;
         }
@@ -250,8 +250,8 @@ public class GameServer
             if (!TryGetSessionEntityId(auth.SessionToken, out string sessionEntityId)
                 || !string.Equals(sessionEntityId, auth.EntityId, StringComparison.Ordinal))
             {
-                Console.WriteLine($"[auth] ปฏิเสธ: token ไม่ตรงกับ entity ที่อ้าง ({auth.EntityId})");
-                connection.Send(new Abort { Text = "การยืนยันตัวตนไม่ผ่าน" }, header.Seq);
+                Console.WriteLine($"[auth] Rejected: token does not match claimed entity ({auth.EntityId})");
+                connection.Send(new Abort { Text = "Authentication failed" }, header.Seq);
                 connection.Close();
                 return;
             }
@@ -260,8 +260,8 @@ public class GameServer
             if (playerContext == null)
             {
                 // เดิมตรงนี้ถอยไปใช้ตัวละครสล็อตแรกให้เลย (ดู GetPlayerContext) ⇒ ใส่ id มั่วก็เข้าเล่นได้
-                Console.WriteLine($"[auth] ปฏิเสธ: ไม่รู้จักตัวละคร {entityId}");
-                connection.Send(new Abort { Text = "ไม่พบตัวละครนี้" }, header.Seq);
+                Console.WriteLine($"[auth] Rejected: unknown character {entityId}");
+                connection.Send(new Abort { Text = "Character not found" }, header.Seq);
                 connection.Close();
                 return;
             }
@@ -283,7 +283,7 @@ public class GameServer
                 {
                     // ปกติไม่ควรเกิด (Auth กรองไปแล้ว) — กันไว้เพราะเดิมจุดนี้ NullReference ไม่ได้
                     // เพราะมี fallback อยู่ ตอนตัด fallback ออกจึงต้องมีด่านตรงนี้ด้วย
-                    Console.WriteLine($"[auth] Ready: ไม่รู้จักตัวละคร {text} — ตัดสาย");
+                    Console.WriteLine($"[auth] Ready: unknown character {text} — disconnecting");
                     connection.Close();
                     return;
                 }
@@ -355,7 +355,7 @@ public class GameServer
             ? null
             : playerContext.PersonalRegionId;
         Console.WriteLine(
-            $"[welcome] {entityId[..Math.Min(8, entityId.Length)]} Region.Id={msg.Region.Id} Role={msg.Region.Role} TerrainId={msg.Region.TerrainId} TemplateId={msg.Region.TemplateId} PersonalRegionId={msg.PersonalRegionId ?? "(ว่าง)"}");
+            $"[welcome] {entityId[..Math.Min(8, entityId.Length)]} Region.Id={msg.Region.Id} Role={msg.Region.Role} TerrainId={msg.Region.TerrainId} TemplateId={msg.Region.TemplateId} PersonalRegionId={msg.PersonalRegionId ?? "(empty)"}");
         msg.Options.Bool = new[]
         {
             new BoolOption { Key = "market.ui_enabled", Value = true }
