@@ -8,30 +8,30 @@ using Durango.Utils;
 namespace Durango.Online;
 
 /// <summary>
-/// [5 ก.ย. 2026] ตัววัดสุขภาพเซิร์ฟ — เก็บที่เดียว ให้ <c>/health</c> อ่าน
+/// [Sep 5, 2026] Centralized server health metrics exposed through <c>/health</c>.
 ///
-/// ทำไมต้องมี: ก่อนหน้านี้ไม่มีตัวเลขให้ดูเลยสักตัว เวลาเซิร์ฟหน่วงต้องเดาเอาว่าเป็นเพราะอะไร
-/// (อาการ "tps 120 → 2" ตอนมือถือโหลด bundle กว่าจะรู้ว่าเป็น GC ก็ไล่หาอยู่หลายวัน)
-/// มีตัวเลขแล้วดูออกทันทีว่ารอบเกมช้าจริงไหม เซฟค้างไหม พังกี่ครั้ง
+/// Previously there were no metrics, so diagnosing server slowdowns required guesswork.
+/// For example, a drop from 120 to 2 TPS during mobile bundle downloads was initially mistaken for other issues.
+/// These metrics show whether ticks are slow, saves are stuck, and how often errors occur.
 ///
-/// ออกแบบให้เบา: เก็บเวลาลง ring buffer ที่จองไว้ครั้งเดียว (ไม่ alloc ต่อรอบ)
-/// เก็บเป็น "ไมโครวินาที" ไม่ใช่ ms เพราะรอบปกติสั้นกว่า 1 ms ⇒ ปัดเป็น ms แล้วจะเป็น 0 หมด
-/// การเรียงลำดับหาค่า p50/p99 ทำเฉพาะตอนมีคนขอ /health เท่านั้น ไม่ได้ทำทุกรอบ
+/// Designed to be lightweight: timings use a preallocated ring buffer with no per-tick allocations.
+/// Store microseconds rather than milliseconds because normal ticks can be shorter than 1 ms.
+/// Sort samples for p50/p99 only when /health is requested, not on every tick.
 ///
-/// ⚠️ เขียนจาก main loop และอ่านจาก /health ซึ่งก็รันบน main loop เดียวกัน (Gateway.Process
-/// ถูกเรียกใน Host.Process) ⇒ ไม่ต้องล็อก
+/// ⚠️ Written from the main loop and read by /health on the same loop (Gateway.Process
+/// is called from Host.Process), so no lock is needed.
 /// </summary>
 public static class ServerMetrics
 {
-    /// <summary>จำนวนรอบที่เก็บย้อนหลัง — 512 รอบ ≈ 4 วินาทีที่ 120 tps (พอเห็นอาการกระตุกสด ๆ)</summary>
+/// <summary>Number of historical samples; 512 samples represent about 4 seconds at 120 TPS.</summary>
     private const int SampleCount = 512;
 
     private static readonly double _usPerTimestamp = 1_000_000.0 / System.Diagnostics.Stopwatch.Frequency;
 
-    /// <summary>เวลาต่อรอบเต็ม (เริ่มรอบ → เริ่มรอบถัดไป รวม Thread.Sleep) — บอกว่า tps ตกจริงไหม</summary>
+/// <summary>Full tick duration from one tick start to the next, including Thread.Sleep; useful for detecting TPS drops.</summary>
     private static readonly int[] _tickUs = new int[SampleCount];
 
-    /// <summary>เวลาที่ใช้ทำงานจริงในรอบ (host.Process อย่างเดียว) — บอกว่างานล้นงบเวลาไหม</summary>
+/// <summary>Actual processing time spent inside host.Process; useful for detecting work that exceeds the tick budget.</summary>
     private static readonly int[] _workUs = new int[SampleCount];
 
     private static int _sampleAt;
@@ -48,7 +48,7 @@ public static class ServerMetrics
 
     public static void MarkBoot() => _bootAt = Environment.TickCount64;
 
-    /// <summary>เรียกท้ายทุกรอบของ main loop — รับค่าเป็น timestamp ดิบของ Stopwatch (แปลงหน่วยที่นี่)</summary>
+/// <summary>Called at the end of each main-loop tick; converts raw Stopwatch timestamps into durations.</summary>
     public static void RecordTick(long loopTimestamps, long workTimestamps)
     {
         int i = _sampleAt;
@@ -73,7 +73,7 @@ public static class ServerMetrics
 
     public static long UptimeSec => _bootAt == 0 ? 0 : (Environment.TickCount64 - _bootAt) / 1000;
 
-    /// <summary>เซฟสำเร็จครั้งล่าสุดเมื่อกี่วินาทีที่แล้ว — -1 = ยังไม่เคยเซฟสำเร็จเลยตั้งแต่บูต</summary>
+/// <summary>Seconds since the last successful save; -1 means no save has succeeded since startup.</summary>
     public static long LastSaveAgoSec => _lastSaveAt == 0 ? -1 : (Environment.TickCount64 - _lastSaveAt) / 1000;
 
     public static int SaveFailures => _saveFailures;
@@ -86,7 +86,7 @@ public static class ServerMetrics
 
     public static void WorkStats(out double p50, out double p99, out double max) => Stats(_workUs, out p50, out p99, out max);
 
-    /// <summary>คืนค่าเป็น "มิลลิวินาที" (ตัวเลขที่คนอ่านเข้าใจ) จากตัวอย่างที่เก็บเป็นไมโครวินาที</summary>
+/// <summary>Convert recorded microseconds to milliseconds for human-readable output.</summary>
     private static void Stats(int[] src, out double p50, out double p99, out double max)
     {
         int n = _sampleFilled;
@@ -95,8 +95,8 @@ public static class ServerMetrics
             p50 = p99 = max = 0.0;
             return;
         }
-        // ตัวอย่างเรียงจาก index 0 เสมอ: ตอนยังไม่เต็ม _sampleFilled == _sampleAt
-        // ตอนเต็มแล้ววนทับของเก่า ⇒ ทั้งอาเรย์คือของจริงทั้งหมด (ลำดับไม่สำคัญเพราะจะ sort อยู่แล้ว)
+// Samples are contiguous from index 0 until the buffer fills: _sampleFilled == _sampleAt.
+// Once full, old entries are overwritten; all array entries are valid and can be sorted.
         int[] sorted = new int[n];
         Array.Copy(src, sorted, n);
         Array.Sort(sorted);
@@ -106,21 +106,21 @@ public static class ServerMetrics
     }
 }
 
-// แทน nexonSRC/Durango.Online/Server.cs + Servers.cs (โฮสต์ฝั่ง client)
-// ความต่างจากต้นฉบับ (เอกสารเต็มใน docs/server/ServerNx.md):
-//  - ต้นฉบับ: 1 สล็อต = 1 โลก (offline โฮสต์คนเดียว) — ที่นี่: โลกเดียว (สล็อต 0) + ผู้เล่นหลายคน
-//  - ตัด Cluster.OnRequestAccount ฝั่ง PortraitBuilder/UI ออก (/accounts อยู่ที่ Gateway)
-//  - รูปร่างไฟล์เซฟ .player/.world คงต้นฉบับ (AppData/offline/{cluster}/)
+// Replaces nexonSRC/Durango.Online/Server.cs and Servers.cs (the client-side host).
+// Differences from the original are documented in docs/server/ServerNx.md:
+// - Original: one slot per world (single-player offline host); here: world in slot 0 plus multiple players.
+// - Cluster.OnRequestAccount in PortraitBuilder/UI is removed; /accounts is handled by Gateway.
+// - .player/.world save format remains compatible with AppData/offline/{cluster}/.
 public class Host
 {
-    /// <summary>cluster_mode ที่ /knock+/entry ตอบ
+/// <summary>Cluster mode returned by /knock and /entry.</summary>
     ///
-    /// [5 ก.ย. 2026] เปลี่ยนค่าตั้งต้นจาก Offline เป็น **Online** — โปรเจกต์นี้ทำเวอร์ชันออนไลน์เท่านั้น
-    /// ค่านี้ถึง client 2 ทาง: (1) /entry → TitleMenuGroup.cs:895 อ่านเมื่อมาทาง Server.ConnectTo
-    /// (2) cluster ที่เลือกบนหน้า Title → TitleMenuUserControlBase.cs:148 (Mode ของ cluster เอง)
-    /// ⚠️ Mode ที่ client รู้จักมี 5 ค่า (Online/Offline/Editable/SingleMode/MultiMode ดู
-    /// client/Durango.Online/GameServer.cs:159-160) แต่ enum ฝั่งนี้พอร์ตมาแค่ 3 ตามที่ต้นฉบับ
-    /// ของเซิร์ฟใช้จริง — ส่งค่าที่ไม่มีใน enum ของ client จะถูก fallback ทิ้ง</summary>
+/// [Sep 5, 2026] Default changed from Offline to Online because this project targets online play only.
+/// The value reaches the client through two paths: /entry → TitleMenuGroup.cs:895 when using Server.ConnectTo,
+/// and the selected cluster on the title screen → TitleMenuUserControlBase.cs:148.
+/// ⚠️ The client knows five modes (Online/Offline/Editable/SingleMode/MultiMode; see
+/// client/Durango.Online/GameServer.cs:159-160), but this server port includes only the three used by the original server.
+/// Values missing from the client enum will be discarded by its fallback.</summary>
     public static Mode ClusterMode = Mode.Online;
 
     private readonly string _clusterKey;
@@ -131,7 +131,7 @@ public class Host
 
     private PlayerContext _fallbackPlayer;
 
-    /// <summary>โลกของทุกเกาะ (ระบบล่องเรือ) — สร้างหลัง GameServer ใน Start()</summary>
+/// <summary>Worlds for all islands (boat travel); created after GameServer in Start().</summary>
     public WorldRegistry Worlds { get; private set; }
 
     public GameServer GameServer { get; private set; }
@@ -141,21 +141,21 @@ public class Host
     public IReadOnlyList<Context> Contexts => _contexts;
 
     /// <summary>
-    /// [5 ก.ย. 2026] เพดานผู้เล่นออนไลน์พร้อมกัน (--max-players) — 0 หรือติดลบ = ไม่จำกัด
-    /// เดิม Program รับค่ามาแล้วพิมพ์ออกจอเฉย ๆ ไม่มีที่ไหนเอาไปใช้เลย (ดู Gateway /entry)
+/// [Sep 5, 2026] Maximum concurrent online players (--max-players); 0 or a negative value means unlimited.
+/// Previously Program parsed and printed this setting but never enforced it; see Gateway /entry.
     /// </summary>
     public int MaxPlayers { get; set; }
 
     /// <summary>
-    /// รหัสผ่านของเส้นทางสำหรับคนดูแล (/health) — ว่าง = ให้เฉพาะเครื่องตัวเองเรียกได้
-    /// ตั้งด้วย --admin-token หรือ env DURANGO_ADMIN_TOKEN (ดู Gateway.IsAdminAllowed)
+/// Admin token for /health; empty means only the local machine can access it.
+/// Set with --admin-token or DURANGO_ADMIN_TOKEN; see Gateway.IsAdminAllowed.
     /// </summary>
     public string AdminToken { get; set; }
 
-    /// <summary>เวอร์ชันตัวเกมต่ำสุดที่ยอมให้เข้า — null = รับทุกเวอร์ชัน (ดู Gateway /knock)</summary>
+/// <summary>Minimum accepted client version; null means all versions are accepted. See Gateway /knock.</summary>
     public string MinClientVersion { get; set; }
 
-    /// <summary>ลิงก์โหลดตัวเกมใหม่ — ต้องมีถ้าจะเปิดด่านเวอร์ชัน</summary>
+/// <summary>Client download URL, required when version gating is enabled.</summary>
     public string DownloadUrl { get; set; }
 
     public Host(string clusterKey)
@@ -163,7 +163,7 @@ public class Host
         _clusterKey = string.IsNullOrEmpty(clusterKey) ? "nx" : clusterKey;
     }
 
-    /// <summary>โหลดสล็อตจากดิสก์ (เทียบเท่า Server ctor ต้นฉบับ) + เตรียมโลกสล็อต 0</summary>
+/// <summary>Load slots from disk (equivalent to the original Server constructor) and prepare world slot 0.</summary>
     public void Load()
     {
         string basePath = WorldContext.GetBasePath(_clusterKey);
@@ -184,7 +184,7 @@ public class Host
             if (world != null) worlds[world.PlayerSlot] = world;
         }
 
-        // โลก = สล็อต 0 (สร้างถ้าไม่มี) — ผู้เล่น = สล็อต >= 1
+// World uses slot 0 (created if missing); player slots start at 1.
         if (!worlds.TryGetValue(0, out _worldCtx))
         {
             _worldCtx = new WorldContext();
@@ -195,7 +195,7 @@ public class Host
                 _worldCtx.TerrainId = TerrainLoader.DefaultTerrainFile;
             }
             _worldCtx.Save(persistent: false);
-            Console.WriteLine($"[host] สร้างโลกใหม่ (terrain {_worldCtx.TerrainId}) → {_worldCtx.Path}");
+            Console.WriteLine($"[host] Created new world (terrain {_worldCtx.TerrainId}) → {_worldCtx.Path}");
         }
 
         foreach (var pair in worlds)
@@ -218,7 +218,7 @@ public class Host
         }
         _contexts.Sort((a, b) => a.PlayerSlot.CompareTo(b.PlayerSlot));
 
-        // fallback player ตามต้นฉบับ (context ของสล็อตแรก หรือสร้างใหม่ถ้ายังไม่มีใคร)
+// Fallback player context, following the original behavior: first slot or a new context if none exists.
         _fallbackPlayer = _contexts.FirstOrDefault()?.Player;
         if (_fallbackPlayer == null)
         {
@@ -226,18 +226,18 @@ public class Host
             _contexts.Add(new Context(_worldCtx, _fallbackPlayer));
         }
 
-        Console.WriteLine($"[host] cluster '{_clusterKey}': ผู้เล่น {_contexts.Count} สล็อต โหลดจาก {AppData.CombinePath(basePath)}");
-        // รายชื่อที่ถูกแบน — เก็บข้างไฟล์เซฟของ cluster นี้ (คนละ cluster คนละรายชื่อ)
+            Console.WriteLine($"[host] Cluster '{_clusterKey}': loaded {_contexts.Count} player slots from {AppData.CombinePath(basePath)}");
+// Ban lists are stored beside each cluster's save files; each cluster has its own list.
         BanList.Load(System.IO.Path.Combine(AppData.CombinePath(basePath), "bans.json"));
     }
 
     public void Start(int gamePort, int gatewayPort, string publicHost, string androidBundlesDir, string assetsDir, string dataDir = null)
     {
         GameServer = new GameServer(_worldCtx, _fallbackPlayer);
-        // โลกของเกาะตั้งต้น (ไฟล์ 0.world ของต้นฉบับ) ใช้ต่อเป็นเกาะแรกของสารบัญ
+// The original starting-island world (0.world) is reused as the first island in the catalog.
         Worlds = new WorldRegistry(_clusterKey, GameServer.World, _worldCtx?.TerrainId);
         GameServer.Worlds = Worlds;
-        // ลงทะเบียนเกาะส่วนตัวของผู้เล่นที่โหลดมาแล้ว ก่อนมีคนเดินทางเข้า
+// Register loaded private islands before any player travels to them.
         foreach (Context context in _contexts)
         {
             PlayerContext pc = context.Player;
@@ -274,16 +274,16 @@ public class Host
     {
         Gateway?.Close();
         GameServer?.Close();
-        // เซฟโลกทุกสล็อตก่อนปิด (ต้นฉบับ: Ctrl+C ผ่าน Server.EndServer → World.Save)
+// Save every world slot before shutdown (original: Ctrl+C → Server.EndServer → World.Save).
         _worldCtx?.Save(persistent: false);
     }
 
     /// <summary>
-    /// เซฟทุกอย่าง — เซฟทีละส่วน ส่วนไหนพังก็ไปต่อ
+/// Save all state, processing each component independently so one failure does not prevent the rest.
     ///
-    /// [แก้เอง] 5 ก.ย. 2026 — เดิมไม่มี try/catch เลย: ถ้าเซฟผู้เล่นคนแรกพัง (ดิสก์เต็ม/ไฟล์ถูกล็อก)
-    /// คนที่เหลือ **ไม่ได้เซฟเลยสักคน** แล้ว exception ยังเด้งขึ้นไปถึง main loop กลายเป็น loop error
-    /// ปนกับปัญหาอื่น ⇒ ตอนนี้แยกนับเป็น save_failures ให้เห็นชัดใน /health
+/// [Local fix, Sep 5, 2026] Previously there was no try/catch; if saving the first player failed (full disk or locked file),
+/// no other players were saved and the exception bubbled into the main loop as an unrelated loop error.
+/// Save failures are now counted separately and exposed through /health.
     /// </summary>
     public void SaveAll()
     {
@@ -295,7 +295,7 @@ public class Host
         catch (Exception e)
         {
             ok = false;
-            Console.WriteLine("[save] ⚠️ เซฟโลกหลักไม่สำเร็จ: " + e.Message);
+                Console.WriteLine("[save] ⚠️ Failed to save the main world: " + e.Message);
         }
         try
         {
@@ -304,7 +304,7 @@ public class Host
         catch (Exception e)
         {
             ok = false;
-            Console.WriteLine("[save] ⚠️ เซฟโลกของเกาะไม่สำเร็จ: " + e.Message);
+                Console.WriteLine("[save] ⚠️ Failed to save an island world: " + e.Message);
         }
         foreach (Context context in _contexts)
         {
@@ -315,7 +315,7 @@ public class Host
             catch (Exception e)
             {
                 ok = false;
-                Console.WriteLine($"[save] ⚠️ เซฟผู้เล่นสล็อต {context.PlayerSlot} ไม่สำเร็จ: {e.Message}");
+                Console.WriteLine($"[save] ⚠️ Failed to save player slot {context.PlayerSlot}: {e.Message}");
             }
         }
         if (ok)
@@ -328,22 +328,22 @@ public class Host
         }
     }
 
-    /// <summary>ตัวชี้ฟิลด์ผู้เล่นใน World — ค้นหาครั้งเดียวแล้วเก็บไว้ (ดู PlayersOnline)</summary>
+/// <summary>Cached reference to the player list in World; resolved once for PlayersOnline.</summary>
     private static System.Reflection.FieldInfo _worldPlayersField;
 
     private static bool _worldPlayersFieldMissing;
 
     /// <summary>
-    /// จำนวนผู้เล่นที่อยู่ในโลกจริงตอนนี้ รวมทุกเกาะ — คืน -1 เมื่อ "นับไม่ได้"
+/// Count players currently in the world across all islands; returns -1 when the count cannot be read.
     ///
-    /// ⚠️ ทำไมต้องส่องด้วย reflection: World เก็บผู้เล่นไว้ใน <c>private readonly List&lt;Player&gt; _players</c>
-    /// (Core/World.cs:44) และไม่เปิด public ให้เลยสักทาง ส่วน GameServer ก็เก็บ _connections เป็น private
-    /// (Core/GameServer.cs:27) — ทั้งสองไฟล์อยู่นอกขอบเขตที่งานรอบนี้แก้ได้
-    /// **วิธีที่ถูกต้องกว่าคือเพิ่มบรรทัดเดียวใน World.cs: `public int PlayerCount => _players.Count;`
-    /// แล้วเปลี่ยนมาเรียกอันนั้นแทน** — ที่นี่อ่านอย่างเดียว ไม่แก้ค่า และแคช FieldInfo ไว้
-    /// ⇒ ต้นทุนต่อครั้ง = อ่านฟิลด์ + .Count ต่อ 1 เกาะ และเรียกเฉพาะตอนมีคนขอ /health เท่านั้น
+/// ⚠️ Reflection is used because World stores players in private readonly List&lt;Player&gt; _players
+/// (Core/World.cs:44), while GameServer stores _connections as private (Core/GameServer.cs:27).
+/// Both files are outside the scope of this change.
+/// A cleaner solution would expose public int PlayerCount => _players.Count in World.cs
+/// and use that property instead. This code only reads and caches FieldInfo; it does not modify state.
+/// Cost is one field read and Count per island, and it runs only when /health is requested.
     ///
-    /// เรื่องเธรด: ลิสต์นี้ถูกแก้จาก main loop และผู้เรียก (/health, /entry) ก็รันบน main loop เดียวกัน
+/// Thread safety: the list is modified by the main loop, and /health and /entry also run on that loop.
     /// </summary>
     public int PlayersOnline()
     {
@@ -355,7 +355,7 @@ public class Host
             if (_worldPlayersField == null)
             {
                 _worldPlayersFieldMissing = true;
-                Console.WriteLine("[health] นับผู้เล่นออนไลน์ไม่ได้ — World._players หายไป (เปลี่ยนชื่อ?)");
+                Console.WriteLine("[health] Could not count online players; World._players field was not found (renamed?)");
                 return -1;
             }
         }
@@ -384,7 +384,7 @@ public class Host
         }
     }
 
-    /// <summary>จำนวนเกาะที่เปิดอยู่ในหน่วยความจำตอนนี้ (โลกถูกสร้างแบบ lazy เมื่อมีคนไปถึง)</summary>
+/// <summary>Number of island worlds currently in memory; worlds are created lazily when players arrive.</summary>
     public int WorldsLoaded()
     {
         if (Worlds == null) return GameServer?.World != null ? 1 : 0;
@@ -406,7 +406,7 @@ public class Host
         return max + 1;
     }
 
-    /// <summary>สร้าง context ชั่วคราว (ยังไม่เซฟ — จะกลายเป็นสล็อตจริงเมื่อ /players หรือเข้าโลกแล้วมีการเปลี่ยนแปลง)</summary>
+/// <summary>Create a temporary context without saving it; it becomes a real slot when /players or world changes require persistence.</summary>
     public PlayerContext CreateTemporaryContext(string entityId, string name, int? level)
     {
         var context = new PlayerContext();
@@ -433,16 +433,16 @@ public class Host
         return context;
     }
 
-    /// <summary>เลื่อน context ชั่วคราวขึ้นเป็นสล็อตจริงบนดิสก์ (/players เรียก)</summary>
+/// <summary>Promote a temporary context to a persistent on-disk player slot; called by /players.</summary>
     public PlayerContext PersistAsSlot(PlayerContext context)
     {
-        if (!string.IsNullOrEmpty(context.Path)) return context; // เป็นสล็อตจริงแล้ว
+if (!string.IsNullOrEmpty(context.Path)) return context; // Already a persistent slot.
         int slot = NextSlot();
         context.PlayerSlot = slot;
         context.Initialize(PlayerContext.MakePath(slot, _clusterKey));
         context.Save();
         _contexts.Add(new Context(_worldCtx, context));
-        Console.WriteLine($"[host] ผู้เล่น '{context.PlayerInfo.PlayerName}' ({context.EntityId}) → สล็อต {slot}");
+            Console.WriteLine($"[host] Player '{context.PlayerInfo.PlayerName}' ({context.EntityId}) → slot {slot}");
         return context;
     }
 
@@ -456,27 +456,27 @@ public class Host
     }
 
     /// <summary>
-    /// [5 ก.ย. 2026] เปิดให้บัญชีแรกที่เข้ามารับ "ตัวละครกำพร้า" ไปเป็นของตัวเอง
+/// [Sep 5, 2026] Allow the first connecting account to adopt unowned characters.
     ///
-    /// ตัวละครกำพร้า = เซฟที่สร้างไว้ก่อนมีระบบบัญชี จึงไม่มี <c>owner_key</c>
-    /// โดยปริยายมันจะ **มองไม่เห็นและเข้าไม่ได้เลย** ซึ่งถูกต้องด้านความปลอดภัย
-    /// แต่ทำให้เซฟเดิมของเซิร์ฟทดสอบใช้ต่อไม่ได้ ⇒ เปิดสวิตช์นี้ตอนย้ายข้อมูล **ครั้งเดียว**
+/// An unowned character is a save created before account ownership was introduced, so it has no <c>owner_key</c>.
+/// Such characters are hidden and inaccessible by default, which is the secure behavior.
+/// To reuse test-server saves, enable this switch for a one-time migration only.
     ///
-    /// ⚠️ **ห้ามเปิดค้างไว้ตอนเปิดให้คนนอกเล่น** — เปิดอยู่แปลว่าใครก็ตามที่ต่อเข้ามาเป็นคนแรก
-    /// จะได้ตัวละครที่ยังไม่มีเจ้าของไปทั้งหมด ซึ่งก็คือช่องโหว่เดิมในรูปแบบที่แคบลงเท่านั้น
-    /// ค่าตั้งต้นจึงเป็นปิด และเซิร์ฟจะเตือนทุกครั้งที่บูตขึ้นมาพร้อมสวิตช์นี้
+/// ⚠️ Never leave this enabled for public play: the first account to connect
+/// would receive every unowned character, recreating the original ownership vulnerability in a narrower form.
+/// Disabled by default; the server warns on startup if the switch is enabled.
     /// </summary>
     public static bool AdoptOrphans { get; set; }
 
     /// <summary>
-    /// โหมดปิดปรับปรุง — คนใหม่เข้าไม่ได้ แต่คนที่เล่นอยู่ยังเล่นต่อได้
+/// Maintenance mode blocks new players while allowing current players to continue.
     ///
-    /// ตั้งใจไม่เตะคนที่เล่นอยู่ทันที เพื่อให้ประกาศก่อนแล้วรอคนทยอยออกเองได้
-    /// (audit: เดิมไม่มีสวิตช์อะไรเลย จะปิดปรับปรุงต้องดับทั้งเซิร์ฟทันที)
+/// Existing players are not kicked immediately, so administrators can broadcast a warning and let players leave.
+/// Previously, maintenance required shutting down the entire server.
     /// </summary>
     public static bool Maintenance { get; set; }
 
-    /// <summary>ใครออนไลน์อยู่บ้าง (สำหรับหน้าแอดมิน) — ต้องรู้ก่อนถึงจะเตะถูกคน</summary>
+/// <summary>List online players for the admin panel so the correct player can be kicked.</summary>
     public List<Dictionary<string, object>> DescribeOnline()
     {
         var result = new List<Dictionary<string, object>>();
@@ -497,14 +497,14 @@ public class Host
     }
 
     /// <summary>
-    /// สรุปเงินทั้งเซิร์ฟ (สำหรับหน้าแอดมิน) — ไว้เฝ้าเงินเฟ้อ
+/// Server-wide currency summary for admin-side inflation monitoring.
     ///
-    /// เซิร์ฟนี้ใช้สกุลเดียวคือ T Stone (ดู Core/Player.Wallet.cs) ⇒ "ปริมาณเงินในระบบ"
-    /// คือผลรวม TStone ของทุกตัวละครที่มีไฟล์เซฟ ไม่ใช่เฉพาะคนที่ออนไลน์
+/// This server uses only T Stone (see Core/Player.Wallet.cs); total supply is
+/// the sum of T Stone across all saved characters, not just those online.
     ///
-    /// ⚠️ ตัวเลขนี้ต้องดู **การเปลี่ยนแปลงตามเวลา** ไม่ใช่ค่า ณ จุดเดียว
-    /// เงินเฟ้อ = ยอดรวมโตเร็วกว่าจำนวนผู้เล่น ⇒ ก๊อกน้ำแรงกว่าท่อระบาย
-    /// ให้เรียกเส้นนี้ซ้ำ ๆ แล้วเทียบ total_tstone กับ average
+/// ⚠️ Evaluate changes over time rather than relying on a single snapshot.
+/// Inflation occurs when total balances grow faster than the player population.
+/// Call this endpoint repeatedly and compare total_tstone with average.
     /// </summary>
     public Dictionary<string, object> DescribeEconomy(int topCount = 20)
     {
