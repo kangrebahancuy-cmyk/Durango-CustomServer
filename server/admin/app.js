@@ -264,7 +264,7 @@
                 });
                 body.appendChild(ta);
             } else {
-                body.appendChild(createConfigField(section, section, data, configMeta?.[section]));
+                body.appendChild(createConfigField(section, section, data, configMeta?.General?.[section] ?? configMeta?.[section]));
             }
 
             div.appendChild(body);
