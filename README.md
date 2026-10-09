@@ -63,6 +63,26 @@ dotnet build server/DurangoServer.csproj -c Release
 
 If the build fails, keep the complete terminal output for diagnosis. Do not delete `bin`, `obj`, or save data without identifying the cause first. / Jika build gagal, simpan seluruh output terminal untuk diagnosis. Jangan menghapus `bin`, `obj`, atau data save sebelum penyebabnya diketahui.
 
+## Player accounts / Akun pemain
+
+The gateway now exposes a persistent username/password account API:
+
+- `POST /auth/register` with form fields `username` and `password`.
+- `POST /auth/login` with form fields `username` and `password`.
+- Successful responses return `account_id`, a private random account key. The game client must save this value securely and send it as `account_id` to the existing `/sessions` and `/accounts` routes to link characters to the registered account.
+- Usernames are 3–24 characters (`A-Z`, `a-z`, digits, underscore, hyphen). Passwords must be 10–128 characters. Requests are rate-limited per source IP.
+- Passwords are stored as salted PBKDF2-SHA256 hashes in `AppData/accounts/accounts.json`; plaintext passwords are never saved.
+
+PowerShell smoke-test example (replace the values; do not use a real password in shell history):
+
+```powershell
+$body = @{ username = "test_player"; password = "Use-A-Long-Test-Password-123" }
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8190/auth/register" -Body $body
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8190/auth/login" -Body $body
+```
+
+**Integration status / Status integrasi:** These backend endpoints are committed, but the game client source/login UI is not included in this repository snapshot. The existing client still uses its device-specific account key until its login flow is patched to store and send the returned `account_id`. Therefore this API is not yet a complete in-game login experience, and it must not be treated as a public-production security boundary. The gateway currently uses HTTP; deploy behind HTTPS before sending real passwords over a network. / Endpoint backend sudah dikomit, tetapi source client/UI login tidak ada dalam snapshot repository ini. Client yang ada masih menggunakan kunci akun khusus perangkat sampai alur login client diperbarui untuk menyimpan dan mengirim `account_id` hasil login. Jadi ini belum menjadi pengalaman login lengkap di dalam game dan belum boleh dianggap sebagai batas keamanan produksi publik. Gateway saat ini menggunakan HTTP; gunakan HTTPS sebelum mengirim kata sandi asli melalui jaringan.
+
 ## Server ports / Port server
 
 | Port | Purpose / Fungsi |
