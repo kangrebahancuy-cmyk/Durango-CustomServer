@@ -94,21 +94,27 @@
   };
   const en = {'Masuk':'Sign in','Keluar':'Log out','Ekonomi':'Economy','Memuat...':'Loading...'};
   let language = 'en';
+  const originalText = new WeakMap();
+  const originalAttrs = new WeakMap();
   function translate(value) {
     if (language === 'en') return en[value] || value;
     return id[value] || value;
   }
   function translateNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
-      const value = node.nodeValue, trimmed = value.trim();
+      if (!originalText.has(node)) originalText.set(node, node.nodeValue);
+      const value = originalText.get(node), trimmed = value.trim();
       if (!trimmed) return;
       const result = translate(trimmed);
-      if (result !== trimmed) node.nodeValue = value.replace(trimmed, result);
+      node.nodeValue = result === trimmed ? value : value.replace(trimmed, result);
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       for (const attr of ['placeholder', 'title', 'aria-label']) {
         if (node.hasAttribute(attr)) {
-          const val = node.getAttribute(attr), next = translate(val);
-          if (next !== val) node.setAttribute(attr, next);
+          let values = originalAttrs.get(node);
+          if (!values) { values = {}; originalAttrs.set(node, values); }
+          if (!(attr in values)) values[attr] = node.getAttribute(attr);
+          const val = values[attr], next = translate(val);
+          if (next !== node.getAttribute(attr)) node.setAttribute(attr, next);
         }
       }
       if (node.childNodes) node.childNodes.forEach(translateNode);
