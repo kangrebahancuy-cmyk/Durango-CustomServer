@@ -265,7 +265,7 @@ public partial class Player
         string genCategory = CollectibleTable.CategoryOfGenerator(spec);
         if (genCategory != null && !UnlockedCollectibleCategories().ContainsKey(genCategory))
         {
-            Console.WriteLine($"[gather] {ShortId()} ยังไม่ได้ปลดหมวด '{genCategory}' (gen={spec.Id})");
+            Console.WriteLine($"[gather] {ShortId()} has not unlocked category '{genCategory}' (gen={spec.Id})");
             Send(BuildSkillNeededFor(genCategory), seq);
             return;
         }
@@ -365,7 +365,7 @@ public partial class Player
         {
             // prototype หาย — ถอนจองแล้วยกเลิก ไม่ปล่อยให้ผู้เล่นค้างหลอด
             UnreserveGenerator(harvestKey, spec.Id);
-            Send(new Abort { Text = "ไม่พบไอเทมที่ควรจะได้" }, seq);
+            Send(new Abort { Text = "Expected item was not found" }, seq);
             Send(default(ReplySequenceMark), seq);
             return;
         }
@@ -387,7 +387,7 @@ public partial class Player
             // true เฉพาะตอนเก็บครบทุก generator แล้วจริง ๆ — ฝั่งเกมใช้ตัวนี้สั่ง TargetRunOut()
             RanOut = ranOut
         };
-        Console.WriteLine($"[gather] {EntityId[..Math.Min(8, EntityId.Length)]} เริ่มเก็บ {spec.Id} x{items.Count} " +
+        Console.WriteLine($"[gather] {EntityId[..Math.Min(8, EntityId.Length)]} started gathering {spec.Id} x{items.Count} " +
                           $"จาก {spec.CollectibleId} ที่ ({msg.Tile.x},{msg.Tile.y}) — รอ {gatherDuration:0.#} วิ " +
                           $"· จองแล้ว {taken}/{total}" + (ranOut ? " (จะหมด)" : ""));
 
@@ -407,7 +407,7 @@ public partial class Player
     /// </summary>
     private void RejectCollect(uint seq, string reason, Collect msg)
     {
-        Console.WriteLine($"[gather] ปฏิเสธคำขอเก็บที่ ({msg.Tile.x},{msg.Tile.y}) gen='{msg.GeneratorId}': {reason}");
+        Console.WriteLine($"[gather] Rejected gather request at ({msg.Tile.x},{msg.Tile.y}) gen='{msg.GeneratorId}': {reason}");
         Send(new Abort { Text = reason }, seq);
     }
 
@@ -493,7 +493,7 @@ public partial class Player
             Send(new CollectibleChanged { EntityId = entityId });
         }
         OnContextChanged();
-        Console.WriteLine($"[gather] {EntityId[..Math.Min(8, EntityId.Length)]} จบเก็บครบเวลา · RanOut={ranOut}");
+        Console.WriteLine($"[gather] {EntityId[..Math.Min(8, EntityId.Length)]} finished gathering; timed out · RanOut={ranOut}");
     }
 
     private void ScheduleCollectFinish(
@@ -531,7 +531,7 @@ public partial class Player
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[gather] จบการเก็บไม่สำเร็จ: {e.Message}");
+                Console.WriteLine($"[gather] Gathering failed: {e.Message}");
                 try { FinishCollect(collectedCopy, seqCopy); } catch { /* ignore */ }
             }
             finally
@@ -1112,7 +1112,7 @@ internal static class CollectibleTable
         var raw = Json.ReadFromFile<Dictionary<string, SourceProbeRecipe>>("item/recipes");
         if (raw == null)
         {
-            Console.WriteLine("[gather] ⚠️ ไม่พบ item/recipes.json — ใช้หมวดสำรองทั้งหมด");
+            Console.WriteLine("[gather] ⚠️ item/recipes.json not found; using all fallback categories");
             return _collectibleGenerators;
         }
         var acc = new Dictionary<string, List<string>>();
@@ -1141,7 +1141,7 @@ internal static class CollectibleTable
             }
         }
         foreach (var pair in acc) _collectibleGenerators[pair.Key] = pair.Value.ToArray();
-        Console.WriteLine($"[gather] ขุดคู่ collectible→generator จาก recipes.json ได้ {_collectibleGenerators.Count} ตัว");
+        Console.WriteLine($"[gather] Loaded {_collectibleGenerators.Count} collectible-to-generator mappings from recipes.json");
         return _collectibleGenerators;
     }
 
