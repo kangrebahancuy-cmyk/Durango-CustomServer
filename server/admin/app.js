@@ -99,7 +99,7 @@
             $('#eco-median').textContent = fmt(d.median);
             $('#eco-max').textContent = fmt(d.max);
 
-            // ส่วนต่างจากครั้งก่อน — บวกเร็วกว่าCharactersโต = ก๊อกแรงกว่าท่อระบาย
+            // Compare the previous snapshot to estimate whether currency growth is accelerating.
             const now = Date.now();
             if (lastEconomy) {
                 const dt = Math.max(1, (now - lastEconomy.at) / 1000);
